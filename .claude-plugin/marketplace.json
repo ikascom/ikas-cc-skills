@@ -1,0 +1,13 @@
+{
+  "name": "ikas-cc-skills",
+  "owner": {
+    "name": "ikas"
+  },
+  "plugins": [
+    {
+      "name": "ikas-code-components",
+      "source": "./plugins/ikas-code-components",
+      "description": "ikas Code Components geliştirme skill'leri"
+    }
+  ]
+}
