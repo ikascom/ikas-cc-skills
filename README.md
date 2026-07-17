@@ -27,6 +27,8 @@ Güncelleme için:
 |---|---|
 | [ikas-prop-audit](#ikas-prop-audit) | Bir projedeki tüm component'lerin prop/grup yapısını denetleyip toparlamak |
 | [ikas-theme-globals](#ikas-theme-globals) | Tema global renk/tipografi token setini kurmak, CSS/TSX'i token'lara bağlamak |
+| [ikas-theme-builder](#ikas-theme-builder) | Section/sub-component inşa etmek, prop eklemek, sayfa kompoze etmek, chrome surface kurmak |
+| [ikas-theme-audit](#ikas-theme-audit) | Mevcut bir temanın alışveriş deneyimini kural setine göre denetlemek (kod değiştirmez) |
 
 ---
 
@@ -117,3 +119,91 @@ skills/ikas-theme-globals/
     ├── inventory.py       # hardcoded renk/tipografi envanteri (frekans sıralı)
     └── verify.py          # dangling var() + hardcoded kalıntı + class eşleşme raporu
 ```
+
+---
+
+### ikas-theme-builder
+
+Bir ikas storefront temasında **section ve sub-component inşa etme** iş akışı: yeni
+section scaffold etme, prop ekleme/çıkarma, sayfa kompoze etme (anasayfa, PLP, PDP,
+sepet…), chrome surface kurma (drawer/modal/toast) ve section'ları kural setine göre
+gözden geçirme. `ikas-theme-audit` ile kardeş skill'dir — audit tespit eder, builder
+inşa eder ve düzeltir.
+
+**Tetikleyiciler:** "add a new section", "create the X section", "add a prop", "compose
+the homepage / PDP / cart page", "add a drawer / modal / toast", "review this section
+against the ruleset".
+
+**Dört bilgi kaynağı ve sahiplik alanları:**
+
+| Kaynak | Neyin sahibi |
+|---|---|
+| `references/commerce.md` (skill ile gelir) | UX & dönüşüm kural seti — her yüzeyin ne YAPMASI gerektiği |
+| Design source (Figma/Stitch/design.md/kullanıcı) | Görsel her şey — layout, renk, tipografi, motion |
+| Proje `CLAUDE.md` | Framework kuralları, CLI komut şekilleri, otomatik üretilen dosyalar |
+| `ikas-code-components` MCP | Canlı framework kataloğu — template'ler, prop tipleri, fonksiyon dokümanları |
+
+**Temel disiplinler:** kod yazmadan önce ilgili commerce.md bölümü okunur; framework
+gerçekleri hafızadan değil MCP'den sorgulanır; **görsel karar asla uydurulmaz** — design
+source'ta yoksa tasarım otoritesine (kullanıcıya) sorulur. MCP yanıtlarındaki framework
+gerçekleri (must) ile referans tema alışkanlıkları (preference) ayrıştırılır.
+
+**İş akışları:** yeni section inşası (10 adım: §13 katalog → §5 kontrat → design input →
+ENUM → MCP template → prop yüzeyi → CLI scaffold → API lookup → implement → pre-flight),
+prop ekleme, sayfa kompozisyonu, chrome surface kurulumu, section review. Her görev
+tipinin "önce ne okunur → hangi design girdisi → hangi komut" karar matrisi SKILL.md'de.
+
+**Bitiş kontrolü:** commerce.md §15 build checklist + design fidelity +
+`npx ikas-component check --json` + `build` temiz.
+
+**İçerik:**
+
+```
+skills/ikas-theme-builder/
+├── SKILL.md                    # karar matrisi, görev iş akışları, pre-flight kontroller
+└── references/commerce.md      # tasarımdan bağımsız e-ticaret kural seti (~940 satır)
+```
+
+---
+
+### ikas-theme-audit
+
+Mevcut bir ikas temasının **alışveriş deneyimi denetimi** — kod incelemesi değil.
+Ölçüt, skill ile gelen `references/commerce.md` kural seti; her bulgu ya ihlal ettiği
+bölümü zikreder (§7.1, §13.B…) ya da açıkça "kontrat dışı" etiketlenir. Denetim
+**hiçbir şeyi değiştirmez**; düzeltmeler `ikas-theme-builder`'a yönlendirilir.
+
+**Tetikleyiciler:** "temayı denetle", "eksik section var mı", "akışlar doğru mu",
+"pre-launch review", "bu tema yayına hazır mı".
+
+**Bulgu sınıflandırması:**
+
+| Sınıf | Anlamı |
+|---|---|
+| İhlal (blocker) | commerce.md kontratını kırar (ör. sessiz sepet hatası) |
+| Boşluk (gap) | Zorunlu bir surface/chrome fonksiyonu tamamen yok |
+| Tema tercihi | Kural setinin izin verdiği tasarım sapması — engel değil |
+| Kontrat dışı öneri | Faydalı olabilir ama hiçbir kural gerektirmiyor |
+
+**Beş geçişli denetim prosedürü:** (1) surface envanteri — §4.1 sayfa + §4.2 chrome
+yüzeyleri, (2) shopper journey yürüyüşü — keşiften satın almaya, kurtarma ve güven
+dahil 7 aşama, (3) section bazında §13 zorunlu özellik kontrolü, (4) §14 anti-pattern
+taraması, (5) merchant gerçeklik kontrolü — her metin/görsel düzenlenebilir mi,
+sıfır-düzenleme kurulum yayınlanabilir mi. Sabit kapsam sayesinde aynı temanın iki
+denetimi aynı sonucu verir.
+
+**Rapor sözleşmesi:** Türkçe; karar cümlesi → ihlaller (kanıt + dayanak tablosu) →
+boşluklar → tema tercihleri → kontrat dışı öneriler (maks 5) → öncelikli aksiyon
+listesi. Kapsam argümanları: tam denetim, `surface <name>`, `section <Name>`, `quick`.
+
+**İçerik:**
+
+```
+skills/ikas-theme-audit/
+├── SKILL.md                    # severity taksonomisi, 5 geçişli prosedür, rapor sözleşmesi
+└── references/commerce.md      # ölçüt kural seti (builder ile aynı dosya)
+```
+
+> **Not:** `commerce.md` iki skill'de bilinçli olarak duplike edilmiştir — her skill
+> kendi başına taşınabilir. Kural setinde değişiklik yapılırsa **iki kopya birden**
+> güncellenmelidir.
