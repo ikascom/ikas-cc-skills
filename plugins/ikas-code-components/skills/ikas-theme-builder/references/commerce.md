@@ -52,10 +52,12 @@ A merchant installing this theme with zero edits should see **the design source*
 
 The `ikas-code-components` MCP server is the source of truth for **all framework / API / type / template knowledge**. Before writing code, query MCP — never reconstruct what MCP returns from this doc.
 
+**Calibration rule (also for editing this doc):** this doc states what a surface must DO and points at MCP for shapes. When tempted to quote a signature, field list, or child count here, write a pointer instead — in practice, every fact this doc has ever gotten wrong was a quoted shape; the behavior contracts don't rot.
+
 | MCP tool | Returns | Use when |
 |---|---|---|
 | `list_section_types()` | The section types available as templates | Discovering what's pre-built |
-| `get_section_template(sectionType)` | Production starter: `ikas-config-snippet.json` (full prop list + groups + ENUM ids + `privateVarMap` + `filteredComponentIds`) + working `index.tsx` + `styles.css` + `types.ts` + `global-types.ts` + names-only lists of children / sub-components / utils / hooks. For container sections the CLI command is a multi-step **Setup Recipe** (create children first, capture their opaque `componentId`s, create the parent, then wire `filteredComponentIds` via `update-prop`). An `include` param can bundle child/util/hook subtrees inline | **Always**, before scaffolding any section |
+| `get_section_template(sectionType)` | Production starter: config snippet + working source files + the CLI setup steps (container sections get a multi-step **Setup Recipe** — children first, capture opaque ids, then wire the parent) + child lists; an `include` param bundles subtrees inline | **Always**, before scaffolding any section |
 | `get_section_child(section, name, kind)` | The full files of one child / component / sub-component under a section template | When extending a section with its child |
 | `list_topics()` / `get_framework_guide(topic)` | Framework guides — `ai-workflow`, `common-pitfalls`, `prop-types`, `prop-groups`, `css-scoping`, `form-handling`, `async-data-patterns`, `component-renderer-patterns`, `private-var-map`, `sub-component-catalog`, `custom-enums`, `theme-globals`, `image-handling`, `page-composition`, `global-css`, plus pattern guides: `product-detail-patterns`, `product-list-patterns`, `cart-patterns`, `account-patterns`, `header-footer-patterns`, `review-patterns`, `slider-overlay-patterns`, `blog-patterns`, `navigation-patterns` — the list grows; `list_topics()` is the source of truth | Before writing CSS, prop wiring, forms, async data, slot rendering, navigation |
 | `get_prop_types()` | All ikas.config.json prop types with TS types and examples | When deciding the type of a new prop |
@@ -63,7 +65,7 @@ The `ikas-code-components` MCP server is the source of truth for **all framework
 | `get_type_definition(name)` / `search_types(query)` / `list_types(domain?, kind?)` | Full TS type / enum definitions, ranked matches, filtered listings | Type / enum discovery |
 | `list_functions(category?)` / `get_function_doc(name)` / `get_functions_for_type(typeName)` | Function inventory and per-function docs | Before calling any storefront function |
 | `search_docs(query)` | Hybrid search across functions + framework topics + types | When you don't know which tool to call |
-| `get_editor_workflow()` + the live-editor tools (`list_editor_pages`, `list_page_sections`, `get_component_props`, `get_section_values`, `add_sections_to_page`, `update_page_sections`, `create_page` / `get_page_by_type`, `upload_images`, `search_products` / `list_categories` / `list_brands` / `list_blogs` / `list_blog_categories`, `import_section`, `publish_theme` — guarded, needs explicit confirm) | Placing sections on editor pages and filling their prop **values** (define-props vs fill-values are different jobs). Requires `ikas-component dev` + connected editor | Composing a page / filling content — read `get_editor_workflow()` first |
+| `get_editor_workflow()` + the live-editor tool family (`add_sections_to_page`, `update_page_sections`, `get_component_props`, `get_section_values`, entity lookups, `upload_images`, `publish_theme` — guarded) | Placing sections on editor pages and filling their prop **values** (define-props vs fill-values are different jobs); the workflow doc enumerates the family, tool sequence, and per-type value shapes. Requires `ikas-component dev` + connected editor | Composing a page / filling content — read `get_editor_workflow()` first |
 | Theme-global tools (`list_theme_globals`, `create_theme_global`, `update_theme_color`, `update_theme_color_scheme`, `update_text_style`, `update_theme_breakpoint`, `update_theme_keyframe`, …) | Store-persistent design tokens: colors, typography, color schemes, breakpoints, keyframes | Token work — route to the `ikas-theme-globals` skill |
 | Migration tools (`analyze_old_theme`, `plan_migration`, `get_migration_guide`, `get_migration_example`, `get_section_migration_plan`) | Old-system theme → Code Components migration workflow | Migrating an existing theme |
 | `get_code_example(task)` / `list_examples()` | API usage examples extracted from a production theme (the registry can be empty on some servers — fall back to function docs) | When a function doc alone isn't enough |
@@ -242,7 +244,7 @@ Sub-groups allowed one level deep. **The `appearance` and `layout` groups are ty
 
 ### 6.4 The LINK pattern
 
-The `LINK` prop type produces an `IkasNavigationLink | null` value with fields `href`, `label`, `subLinks`, `itemId?`, `type` (`IkasNavigationLinkType`), `openInNewTab?`. Theme code respects `openInNewTab` and adds `rel="noopener noreferrer"` automatically when true. For navigation menus that need a flat or nested list, use `LIST_OF_LINK`.
+The `LINK` prop type produces an `IkasNavigationLink | null` (field list via `get_type_definition("IkasNavigationLink")`). Theme code respects `openInNewTab` and adds `rel="noopener noreferrer"` automatically when true. For navigation menus that need a flat or nested list, use `LIST_OF_LINK`. LINK `defaultValue`s are typed objects, not `{href, label}` literals — get the accepted shape from `get_prop_types()` before writing shippable defaults (§1).
 
 > **(MCP)** `get_type_definition("IkasNavigationLink")`. Prop type definitions: `get_prop_types()`.
 
@@ -338,7 +340,7 @@ The cart and favorites state merges if the customer had a guest session — no s
 - Price, SKU, stock status, ATC button state update synchronously.
 - Out-of-stock variants are visually marked but still selectable; on selection, ATC reads `outOfStockButtonText` (e.g. "Out of stock — notify me").
 
-> **(MCP)** `get_framework_guide("product-detail-patterns")`. Variant helpers: `get_model_guide("IkasProductVariant")`, `get_function_doc("selectVariantValue")`, `get_function_doc("getSelectedProductVariant")`.
+> **(MCP)** `get_framework_guide("product-detail-patterns")`. Variant helpers: `get_model_guide("IkasProductVariant")`, `get_function_doc("selectVariantValue")`, `get_function_doc("getSelectedProductVariant")`. Notify-me on OOS has storefront support — `list_functions("BackInStock")`.
 
 ### 7.4 Pagination & filtering (PLP)
 
@@ -450,19 +452,11 @@ These live outside the page flow. Visual styling comes from the design source; *
 
 If the design source ships a chrome surface differently (e.g. a full-page Search instead of a modal, no Cart Drawer), build what the design ships — the **function** must exist somewhere, not this specific form.
 
-**The framework already provides plumbing for most chrome surfaces** — query MCP rather than reconstructing:
+**The framework already provides plumbing for most chrome surfaces** — reuse before building (§14 #20). Don't memorize the inventory; read it fresh:
 
-| Primitive | What it gives you | MCP source |
-|---|---|---|
-| `Modal` (sub-component) | Generic modal shell: backdrop + close + scroll-lock + portal | `get_framework_guide("sub-component-catalog")` |
-| `ConfirmModal` (sub-component) | Cancel/confirm dialog for destructive actions | same |
-| `Toast` + `useToast` hook | Portal-based notification queue. The Header-mounted `ToastContainer` convention lives in the header-footer pattern guide, **not** the catalog | same + `get_framework_guide("header-footer-patterns")` |
-| `ImagePreviewModal` (sub-component) | Full-screen image zoom for product galleries | same |
-| `PageLoader` (sub-component) | Full-page route-transition spinner | same |
-| `IkasThemeSlider` *(runtime API from `@ikas/bp-storefront`, not a sub-component)* | Carousels with autoplay / loop / `current` / `goTo(index)` / `dotCount` | `get_framework_guide("slider-overlay-patterns")` |
-| `IkasThemeOverlay` *(runtime API — a state type, NOT a JSX component)* | Overlay state interface (`visible`, `show()`, `hide()`); build the overlay UI yourself (useState + backdrop + scroll lock) | same |
-| `IkasThemeInfiniteScroller` *(runtime API)* | Infinite scroll wrapper | same |
-| Plus shared building blocks: `SliderArrow`, `Button`, `Input`, `Select`, `Checkbox`, `Toggle`, `Textarea`, `Tag`, `Badge`, `Breadcrumb`, `Pagination`, `CollapsibleGroup`, `QuantitySelector`, `FormItem`, `SpinnerIcon`, `SkeletonField`, `ColorInput`, `ProductCard`, `CartItem`, `VariantBadge`, `ReviewCard` / `ReviewForm` / `ReviewSummary` / `StarRating`, `SocialLoginButton`, icons/* (35+ SVGs) | The pieces every chrome surface composes from | `get_framework_guide("sub-component-catalog")` |
+- `get_framework_guide("sub-component-catalog")` — modal shells (`Modal`, `ConfirmModal`), notifications (`Toast` + `useToast`), `ImagePreviewModal`, `PageLoader`, plus the form/UI building blocks and icons every chrome surface composes from.
+- `get_framework_guide("slider-overlay-patterns")` — the runtime APIs from `@ikas/bp-storefront`: `IkasThemeSlider` (carousels), `IkasThemeOverlay` (an overlay *state type*, not a JSX component — build the surface UI yourself), `IkasThemeInfiniteScroller`.
+- `get_framework_guide("header-footer-patterns")` — the Header-mounted `ToastContainer` convention and the mega-menu MenuItem pattern.
 
 ### 9.1 Cart Drawer (when the design ships one)
 
@@ -559,6 +553,7 @@ Disappears on completion or failure. Under reduced-motion: static visible bar.
 - Optional content block visibility (countdown, announcement bar, brand line on PDP, etc.).
 - Section visibility (optional sections only).
 - Section order, within the constraints in §8.
+- Per-section color-scheme selection, when the theme ships designed palettes (scheme-slot architecture — see the `ikas-theme-globals` skill). Picking among designed schemes is design-sanctioned; per-element color knobs still are not.
 
 ### 10.2 Merchants do NOT control
 
@@ -692,6 +687,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Mandatory features:** Title + subtitle; email input + submit; success state replaces the form; inline error state; GDPR consent checkbox.
 - **Interactions:** Submit → optimistic disable input + label swap; success → form replaces with success surface; error → inline message.
 - **A11y:** Required-field indicator on email; `aria-describedby` for the consent checkbox.
+- **MCP starter:** No dedicated template; subscribe via storefront functions — `list_functions("Newsletter")`, don't hand-roll the call.
 
 #### Promo Banner (Countdown)
 
@@ -729,7 +725,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Optional features (when the design ships them):** Brand line; rating (read-only); badges (discount, OOS, "new"); SKU / barcode meta; tags; notify-me opt-in on OOS; size guide modal link; pre-order CTA label override; share buttons.
 - **Interactions:** Per §7.3 (variant select), §7.1 (ATC); favorite toggle optimistic.
 - **A11y:** `<h1>` is product title; variant groups use `<fieldset>` / `<legend>`; gallery uses `aria-roledescription`; ATC reads stock status via `aria-live` when it changes.
-- **MCP starter:** `get_section_template("product-detail-section")` returns the section shell (breadcrumb + gallery + two COMPONENT_LIST slots `components` + `bottomComponents`). The reference theme decomposes the info column into 12 child components — match the design source's component breakdown instead. See `get_framework_guide("product-detail-patterns")`.
+- **MCP starter:** `get_section_template("product-detail-section")` — a slot-based shell (breadcrumb + gallery + COMPONENT_LIST info/bottom regions). The reference theme decomposes the info column into many small child components — match the design source's breakdown instead of copying the reference decomposition. See `get_framework_guide("product-detail-patterns")`.
 
 #### Product Reviews
 
@@ -760,13 +756,13 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Mandatory features:** Title (`<h1>`); item list (row: image + name + variant + price + stepper + remove); order summary panel (subtotal, discounts, taxes, shipping, total); Checkout CTA; continue shopping link; empty state per §7.7.
 - **Optional features:** Discount code input; gift wrap; order notes textarea; shipping calculator.
 - **Interactions:** Per §7.1; Checkout CTA → checkout flow.
-- **MCP starter:** `get_section_template("cart-section")` + `get_framework_guide("cart-patterns")`.
+- **MCP starter:** `get_section_template("cart-section")` + `get_framework_guide("cart-patterns")`. Optional features have storefront functions — discount codes `list_functions("CouponCode")`, gift wrap `list_functions("GiftPackage")`.
 
 #### Login
 
 - **Role:** Authenticate returning customer.
 - **Mandatory features:** Heading (`<h1>`); email + password fields; "Forgot password?" link (always visible); submit CTA (with submitting state); "Register" prompt link; inline error region (`aria-live="polite"`).
-- **Optional features:** Social sign-in providers; "Remember me".
+- **Optional features:** Social sign-in providers (`SocialLoginButton` in the sub-component catalog); phone/SMS login when the storefront supports it (`list_functions("SMSLogin")`); "Remember me".
 - **Interactions:** Per §7.2.
 - **MCP starter:** `get_section_template("login-section")`.
 
@@ -814,7 +810,7 @@ All inherit:
 - **Mandatory features:** Customer name greeting; quick stats (orders count, default address summary); quick links (View orders, Edit profile, Manage addresses, Favorites).
 - **Optional features:** Loyalty status; store credit balance; recent order preview.
 - **Interactions:** "Edit profile" → Profile Edit Modal (§9.4).
-- **MCP starter:** `get_section_template("account-info-section")` ships with 5 child tab components — the design may decompose differently.
+- **MCP starter:** `get_section_template("account-info-section")` ships tab-based child components — the design may decompose differently.
 
 #### Account Orders (list)
 
@@ -826,6 +822,7 @@ All inherit:
 
 - **Mandatory features:** Order number + date + status banner; itemized lines (image, name, variant, qty, line total); shipping + billing address blocks; totals breakdown; tracking link (when shipped+); reorder CTA (optional).
 - **Optional features:** Cancel order CTA (when status allows); download invoice.
+- **MCP:** tracking data via `list_functions("OrderTracking")`; detail/totals via `list_functions("OrderDetail")`.
 
 #### Account Addresses
 
