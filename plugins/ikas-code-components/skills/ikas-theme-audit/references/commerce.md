@@ -55,14 +55,18 @@ The `ikas-code-components` MCP server is the source of truth for **all framework
 | MCP tool | Returns | Use when |
 |---|---|---|
 | `list_section_types()` | The section types available as templates | Discovering what's pre-built |
-| `get_section_template(sectionType)` | Production starter: `ikas-config-snippet.json` (full prop list + groups + ENUM ids + `privateVarMap` + `filteredComponentIds`) + working `index.tsx` + `styles.css` + `types.ts` + CLI `add-component` command + lists of children / sub-components / utils / hooks | **Always**, before scaffolding any section |
+| `get_section_template(sectionType)` | Production starter: `ikas-config-snippet.json` (full prop list + groups + ENUM ids + `privateVarMap` + `filteredComponentIds`) + working `index.tsx` + `styles.css` + `types.ts` + `global-types.ts` + names-only lists of children / sub-components / utils / hooks. For container sections the CLI command is a multi-step **Setup Recipe** (create children first, capture their opaque `componentId`s, create the parent, then wire `filteredComponentIds` via `update-prop`). An `include` param can bundle child/util/hook subtrees inline | **Always**, before scaffolding any section |
 | `get_section_child(section, name, kind)` | The full files of one child / component / sub-component under a section template | When extending a section with its child |
-| `list_topics()` / `get_framework_guide(topic)` | Framework guides — `ai-workflow`, `common-pitfalls`, `prop-types`, `prop-groups`, `css-scoping`, `form-handling`, `async-data-patterns`, `component-renderer-patterns`, `private-var-map`, `sub-component-catalog`, `custom-enums`, plus pattern guides: `product-detail-patterns`, `product-list-patterns`, `cart-patterns`, `account-patterns`, `header-footer-patterns`, `review-patterns`, `slider-overlay-patterns`, `blog-patterns`, `navigation-patterns` | Before writing CSS, prop wiring, forms, async data, slot rendering, navigation |
+| `list_topics()` / `get_framework_guide(topic)` | Framework guides — `ai-workflow`, `common-pitfalls`, `prop-types`, `prop-groups`, `css-scoping`, `form-handling`, `async-data-patterns`, `component-renderer-patterns`, `private-var-map`, `sub-component-catalog`, `custom-enums`, `theme-globals`, `image-handling`, `page-composition`, `global-css`, plus pattern guides: `product-detail-patterns`, `product-list-patterns`, `cart-patterns`, `account-patterns`, `header-footer-patterns`, `review-patterns`, `slider-overlay-patterns`, `blog-patterns`, `navigation-patterns` — the list grows; `list_topics()` is the source of truth | Before writing CSS, prop wiring, forms, async data, slot rendering, navigation |
 | `get_prop_types()` | All ikas.config.json prop types with TS types and examples | When deciding the type of a new prop |
 | `get_model_guide(model)` | A model's full TS type definition + every utility function with summary + every related type + the import statement | Before reading from any storefront model |
 | `get_type_definition(name)` / `search_types(query)` / `list_types(domain?, kind?)` | Full TS type / enum definitions, ranked matches, filtered listings | Type / enum discovery |
 | `list_functions(category?)` / `get_function_doc(name)` / `get_functions_for_type(typeName)` | Function inventory and per-function docs | Before calling any storefront function |
 | `search_docs(query)` | Hybrid search across functions + framework topics + types | When you don't know which tool to call |
+| `get_editor_workflow()` + the live-editor tools (`list_editor_pages`, `list_page_sections`, `get_component_props`, `get_section_values`, `add_sections_to_page`, `update_page_sections`, `create_page` / `get_page_by_type`, `upload_images`, `search_products` / `list_categories` / `list_brands` / `list_blogs` / `list_blog_categories`, `import_section`, `publish_theme` — guarded, needs explicit confirm) | Placing sections on editor pages and filling their prop **values** (define-props vs fill-values are different jobs). Requires `ikas-component dev` + connected editor | Composing a page / filling content — read `get_editor_workflow()` first |
+| Theme-global tools (`list_theme_globals`, `create_theme_global`, `update_theme_color`, `update_theme_color_scheme`, `update_text_style`, `update_theme_breakpoint`, `update_theme_keyframe`, …) | Store-persistent design tokens: colors, typography, color schemes, breakpoints, keyframes | Token work — route to the `ikas-theme-globals` skill |
+| Migration tools (`analyze_old_theme`, `plan_migration`, `get_migration_guide`, `get_migration_example`, `get_section_migration_plan`) | Old-system theme → Code Components migration workflow | Migrating an existing theme |
+| `get_code_example(task)` / `list_examples()` | API usage examples extracted from a production theme (the registry can be empty on some servers — fall back to function docs) | When a function doc alone isn't enough |
 
 **Pointers are starting points, not boundaries.** When the listed tools don't answer your question, fall back to discovery (`list_topics()`, `list_section_types()`, `search_docs(query)`). MCP wins over this doc.
 
@@ -215,6 +219,8 @@ Every image-bearing prop ships as:
 
 The image's aspect ratio, fit, position, overlay opacity — these are design decisions, not props. (Exception: if the design explicitly supports merchant-tunable overlay opacity for a hero, `imageOverlayOpacity` NUMBER is fine.)
 
+The prop-type catalog goes beyond single images: `IMAGE_LIST`, `VIDEO`, `SVG` / `SVG_LIST` (editor-sanitized; render via `normalizeSvg`), `DATE`, `NUMBER_RANGE`, and `*_LIST` entity sources (`CATEGORY_LIST`, `BRAND_LIST`, `BLOG_LIST`, `BLOG_CATEGORY_LIST`, `PRODUCT_ATTRIBUTE_LIST`) all exist — check `get_prop_types()` before inventing a workaround with TEXT props.
+
 > **(MCP)** Image rendering helpers (`getDefaultSrc`, `getThumbnailSrc`, `getSrc`, `createMediaSrcset`): `get_functions_for_type("IkasImage")`.
 
 ### 6.3 Prop group vocabulary
@@ -275,14 +281,15 @@ The interaction grammar of the theme. Behavior is invariant across visual design
 - **Pending state.** ATC button reads `form.isSubmitting`-style state and renders `submittingButtonText`. Drawer / list rows reflecting the same line render `is-pending`.
 - **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Surface the specific `validationError` (`INSUFFICIENT_STOCK`, `INVALID_PRODUCT_OPTION_VALUES`) as user-facing copy.
 
-> **(MCP)** Result shape: `addItemToCart` returns `IkasCartOperationResult { success, validationError }`. Full signature: `get_function_doc("addItemToCart")`. Loading-flag pattern: `get_framework_guide("async-data-patterns")` §2.
+> **(MCP)** Result shape: `addItemToCart` returns `IkasCartOperationResult { success, validationError }` — the type is not in the type index, so read the shape from `get_function_doc("addItemToCart")` (not `get_type_definition`). Loading-flag pattern: `get_framework_guide("async-data-patterns")` §2.
 
 #### Update quantity, remove
 
 - Optimistic — the mutation functions mutate the model in place; the observer re-renders automatically.
+- `changeItemQuantity(item, quantity)` and `removeItem(item)` **also return `Promise<IkasCartOperationResult>`** — check `success` to drive rollback + the error toast. `quantity = 0` removes the line.
 - Pending state on the affected row; rollback + error toast on failure.
 
-> **(MCP)** Mutation semantics (void return + in-place mutation): `get_framework_guide("common-pitfalls")` #3. Functions: `get_function_doc("changeItemQuantity")`, `get_function_doc("removeItem")`, full inventory `list_functions("Cart")` / `list_functions("OrderLineItem")`.
+> **(MCP)** In-place mutation semantics: `get_framework_guide("common-pitfalls")` #3 — most storefront mutations return `void`, but the cart row mutations above are result-returning exceptions. Functions: `get_function_doc("changeItemQuantity")`, `get_function_doc("removeItem")`, full inventory `list_functions("Cart")` / `list_functions("OrderLineItem")`.
 
 #### Empty cart
 
@@ -379,7 +386,7 @@ Loading skeletons match the loaded shape exactly — no layout shift.
 
 For every mutation (cart, favorites, address, profile):
 
-1. Render new state immediately. **Most storefront mutation functions handle step 1 for you** — they return `void` and mutate the model in place; observer-driven re-renders deliver the new state without explicit setState.
+1. Render new state immediately. **Most storefront mutation functions handle step 1 for you** — they mutate the model in place; observer-driven re-renders deliver the new state without explicit setState. (Many return `void`; cart row mutations additionally return an `IkasCartOperationResult` whose `success` flag drives step 5.)
 2. Apply `is-pending` class to the affected UI (row, button, card) for visual feedback during the async window.
 3. Dispatch the mutation. For ATC and similar await-able mutations, use the `try/finally` loading-flag pattern.
 4. On success: remove `is-pending`. Optional toast.
@@ -398,7 +405,7 @@ Track in-flight mutations by stable id (line item id, product id) so parallel mu
 - ARIA: `role="status"` for info/success, `role="alert"` for error.
 - Position is dictated by the design source.
 
-> **(MCP)** `Toast` + `ToastContainer` + `useToast` hook: `get_framework_guide("sub-component-catalog")` + `get_framework_guide("header-footer-patterns")`.
+> **(MCP)** `Toast` + `useToast` hook: `get_framework_guide("sub-component-catalog")`. The Header-mounted `ToastContainer` convention: `get_framework_guide("header-footer-patterns")`.
 
 ### 7.10 Keyboard expectations
 
@@ -449,13 +456,13 @@ If the design source ships a chrome surface differently (e.g. a full-page Search
 |---|---|---|
 | `Modal` (sub-component) | Generic modal shell: backdrop + close + scroll-lock + portal | `get_framework_guide("sub-component-catalog")` |
 | `ConfirmModal` (sub-component) | Cancel/confirm dialog for destructive actions | same |
-| `Toast` + `ToastContainer` + `useToast` hook | Portal-based notification queue; `ToastContainer` mounted from Header | same + `get_framework_guide("header-footer-patterns")` |
+| `Toast` + `useToast` hook | Portal-based notification queue. The Header-mounted `ToastContainer` convention lives in the header-footer pattern guide, **not** the catalog | same + `get_framework_guide("header-footer-patterns")` |
 | `ImagePreviewModal` (sub-component) | Full-screen image zoom for product galleries | same |
 | `PageLoader` (sub-component) | Full-page route-transition spinner | same |
-| `IkasThemeSlider` | Carousels with autoplay / loop / `current` / `goTo` / `dotCount` | `get_framework_guide("slider-overlay-patterns")` |
-| `IkasThemeOverlay` | Overlay state interface (`visible`, `show()`, `hide()`) | same |
-| `IkasThemeInfiniteScroller` | Infinite scroll wrapper | same |
-| Plus shared building blocks: `SliderArrow`, `Button`, `Input`, `Select`, `Checkbox`, `Toggle`, `Textarea`, `Tag`, `Badge`, `Breadcrumb`, `Pagination`, `CollapsibleGroup`, `QuantitySelector`, `FormItem`, `SpinnerIcon`, icons/* (35+ SVGs) | The pieces every chrome surface composes from | `get_framework_guide("sub-component-catalog")` |
+| `IkasThemeSlider` *(runtime API from `@ikas/bp-storefront`, not a sub-component)* | Carousels with autoplay / loop / `current` / `goTo(index)` / `dotCount` | `get_framework_guide("slider-overlay-patterns")` |
+| `IkasThemeOverlay` *(runtime API — a state type, NOT a JSX component)* | Overlay state interface (`visible`, `show()`, `hide()`); build the overlay UI yourself (useState + backdrop + scroll lock) | same |
+| `IkasThemeInfiniteScroller` *(runtime API)* | Infinite scroll wrapper | same |
+| Plus shared building blocks: `SliderArrow`, `Button`, `Input`, `Select`, `Checkbox`, `Toggle`, `Textarea`, `Tag`, `Badge`, `Breadcrumb`, `Pagination`, `CollapsibleGroup`, `QuantitySelector`, `FormItem`, `SpinnerIcon`, `SkeletonField`, `ColorInput`, `ProductCard`, `CartItem`, `VariantBadge`, `ReviewCard` / `ReviewForm` / `ReviewSummary` / `StarRating`, `SocialLoginButton`, icons/* (35+ SVGs) | The pieces every chrome surface composes from | `get_framework_guide("sub-component-catalog")` |
 
 ### 9.1 Cart Drawer (when the design ships one)
 
@@ -519,7 +526,7 @@ If the design source ships a chrome surface differently (e.g. a full-page Search
 
 **Feature surface:** Form with country, name, line 1, line 2, city, state/region, postal code, phone, "Set as default" toggle. Country selector drives state/region visibility. Postal code validation respects country format where the storefront provides hints.
 
-> **(MCP)** `getIkasCustomerAddressForm`, `initAddressForm`, `submitAddressForm`, `deleteAddress`. `list_functions("Address")`.
+> **(MCP)** `getIkasCustomerAddressForm`, `getEmptyAddressForm` (new address), `initAddressForm`, `submitAddressForm`, `deleteCustomerAddress`. `list_functions("Address")`.
 
 ### 9.6 Quick View Modal (optional)
 
@@ -592,8 +599,9 @@ When the storefront supports multiple locales / currencies, expose switchers whe
 ### 12.1 Image performance
 
 - Hero / first viewport image: `fetchpriority="high"`, no `loading="lazy"`.
-- Use storefront image helpers — `getDefaultSrc` (1080), `getThumbnailSrc` (180), `getSrc(size)`, `createMediaSrcset`. Never serve the original.
+- Use storefront image helpers — `getDefaultSrc` (1080), `getThumbnailSrc` (180), `getSrc(image, size)`, `createMediaSrcset`. Never serve the original.
 - For images >400px wide on desktop, render with `srcset` via `createMediaSrcset`.
+- Product media items can be videos — **always branch on `item.isVideo`** before rendering. For videos the `size` argument is ignored (`getSrc(item, 240)` is misleading); use `getDefaultSrc` for the video src, and apply `createMediaSrcset` only to `<img>` elements.
 
 > **(MCP)** Full helper docs: `get_functions_for_type("IkasImage")`.
 
@@ -625,6 +633,8 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **MCP starter**
 
 > **No prop names are listed in this catalogue.** The actual prop list comes from `get_section_template("<sectionType>")` and is auto-generated by the CLI. This doc owns the **intent layer**; the framework owns the **shape layer**.
+>
+> **Template coverage moves faster than this catalogue.** `list_section_types()` also ships sections not catalogued here (currently `features-section`, `category-images-section`, `email-verification-section`) plus non-section *Pattern* templates — API reference implementations, not placeable sections (`add-to-cart`, `bundle-products`, `component-renderer`, `image-handling`, `navigation`, `product-pricing`, `variant-selection`, `favorites`). When a surface isn't catalogued below, check `list_section_types()` first, then derive its contract from §3 + §5.
 
 ---
 
@@ -634,7 +644,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 
 - **Role:** Brand orientation, top of homepage.
 - **Page surface:** Homepage, top slot.
-- **Mandatory features:** ≥1 Hero Slide via COMPONENT_LIST (filtered to a `hero-slide` child); navigation when slide count > 1 (dots and/or arrows, per design); `backgroundColor`.
+- **Mandatory features:** ≥1 Hero Slide via COMPONENT_LIST (filtered to the template's `HeroSliderItem` child); navigation when slide count > 1 (dots and/or arrows, per design); `backgroundColor`.
 - **Optional features (when the design ships them):** Autoplay (BOOLEAN) + autoplay delay (NUMBER ms); show-arrows toggle (BOOLEAN); loop.
 - **Interactions:** Slide CTA click → navigate; swipe → next slide on touch; keyboard arrows when focused; autoplay pauses on user interaction; respects reduced-motion.
 - **A11y:** `aria-roledescription="carousel"` on container; `aria-roledescription="slide"` on slides; dot buttons get `aria-label="Go to slide N"`.
@@ -646,7 +656,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Mandatory features:** Background image / video; foreground content (title + subtitle + primary CTA).
 - **Optional features:** Secondary CTA; eyebrow; image vs video mode; video controls (mute/unmute).
 - **Interactions:** CTA click → navigate; video autoplay muted; users can unmute (controls exposed).
-- **MCP starter:** As children of `hero-slider-section`; drill via `get_section_child`.
+- **MCP starter:** As children of `hero-slider-section`; drill via `get_section_child("hero-slider-section", "HeroSliderItem", "children")`.
 
 #### Featured Collection / Product Slider
 
@@ -775,12 +785,18 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Behavior:** Per §7.2 (enumeration prevention on Forgot; token validation on Recover).
 - **MCP starter:** `get_section_template("forgot-password-section")` + `get_section_template("recover-password-section")`.
 
+#### Email Verification
+
+- **Role:** Post-registration verification landing.
+- **Mandatory features:** Verification status surface driven by the URL token (pending / success / failure); success links onward (account or intended destination); failure offers a re-send affordance. Never blank-screen.
+- **MCP starter:** `get_section_template("email-verification-section")`.
+
 #### Search Results
 
 - **Role:** Full-page search beyond the modal.
 - **Mandatory features:** Query echo ("Results for 'foo'"); result count; filter chips; product grid; empty state.
 - **Optional features:** Sort; blog post results inline (when storefront supports cross-content search).
-- **MCP starter:** Reuse PLP starter (`category-list-section`); search mode via `IkasProductList.type === SEARCH`.
+- **MCP starter:** Reuse PLP starter (`category-list-section`); detect search mode via the `isProductListSearch(list)` helper (don't compare `list.type` by hand — the enum isn't in the type index); echo `list.searchKeyword` in the heading.
 
 ---
 
@@ -860,7 +876,7 @@ All inherit:
 
 - **Role:** Brand identity + primary nav + key actions, persistent.
 - **Mandatory features:** Logo (text or image, link to home); primary nav (multi-level); search trigger → §9.2; account icon → Login or Dashboard; cart icon with count badge → Cart page or §9.1; hamburger (mobile) → §9.3; Announcement Bar (when the design includes one); sticky positioning per design.
-- **Optional features:** Favorites icon; language / currency selector; secondary nav row.
+- **Optional features:** Favorites icon; language / currency selector; secondary nav row; mega-menu — when a nav item needs more than `LIST_OF_LINK` can carry (image, badge, columns), use the MenuItem-child + COMPONENT_LIST pattern from `get_framework_guide("header-footer-patterns")` / `get_framework_guide("navigation-patterns")`.
 - **MCP starter:** `get_section_template("header-section")` + `get_framework_guide("header-footer-patterns")`.
 
 #### Footer
@@ -933,4 +949,4 @@ Before merging a section:
 
 ---
 
-*Last updated: 2026-05-14*
+*Last updated: 2026-07-20 — verified against the live ikas-code-components MCP server.*

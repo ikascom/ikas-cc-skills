@@ -1,22 +1,27 @@
 ---
 name: ikas-theme-globals
-description: Use when creating or migrating ikas theme global COLOR and TYPOGRAPHY design tokens in a Code Components theme project — extracting a token catalog from existing CSS, building tokens for a new theme, or binding CSS/TSX to tokens via cssVar/className. Triggers - tema global renk/tipografi token'ları, create_theme_global, design token migration, global renk ayarları, cssVar/className bağlama, hardcoded renk temizliği.
+description: Use when creating or migrating ikas theme global design tokens (COLOR, TYPOGRAPHY, COLOR SCHEME, breakpoint, keyframe) in a Code Components theme project — extracting a token catalog from existing CSS, building tokens for a new theme, or binding CSS/TSX to tokens via cssVar/className. Triggers - tema global renk/tipografi token'ları, color scheme / palet kurulumu, create_theme_global, design token migration, global renk ayarları, cssVar/className bağlama, hardcoded renk temizliği.
 ---
 
-# ikas Tema Global Token Kurulumu (Renk + Tipografi)
+# ikas Tema Global Token Kurulumu (Renk + Tipografi + Scheme)
 
-Bir ikas Code Components temasında renk ve tipografi global token setini kurar,
-CSS/TSX'i token'lara bağlar ve doğrular. Token seti **temanın kendi CSS diline göre
-tasarlanır** — hazır bir katalog şablonu dayatılmaz; başka temaların setleri en fazla
-ilham kaynağıdır.
+Bir ikas Code Components temasında global token setini (renk, tipografi, color scheme;
+gerekirse breakpoint/keyframe) kurar, CSS/TSX'i token'lara bağlar ve doğrular. Token seti
+**temanın kendi CSS diline göre tasarlanır** — hazır bir katalog şablonu dayatılmaz;
+başka temaların setleri en fazla ilham kaynağıdır. Güncel kavram seti ve kurallar için
+MCP `get_framework_guide("theme-globals")` kaynağın — bu skill iş akışını verir,
+framework gerçeklerini oradan doğrula.
 
 **Temel ilke: envanter ve doğrulama script'le (deterministik), token seti kararı
 kullanıcı onayıyla.** Token oluşturmak mağaza-kalıcı bir yan etkidir; onaysız yapılmaz.
 
 ## Ön koşullar
 
-- `ikas-component dev` çalışıyor VE editör tarayıcıda bağlı olmalı (MCP token
-  araçlarının ikisi de gerekir; sadece dev yetmez — "No editor connected" hatası verir).
+- `ikas-component dev` çalışıyor VE editör tarayıcıda bağlı olmalı (TÜM MCP
+  theme-global araçları için gerekir; sadece dev yetmez — "No editor connected" hatası
+  verir). Editörsüz alternatif: CLI eşdeğerleri (`npx ikas-component create-color`,
+  `create-text-style`, `create-color-scheme`, `list-theme-globals`,
+  `delete-design-token`…).
 - **İlk iş `list_theme_globals`** — mevcut katalogu çek, çıktıyı olduğu gibi bir dosyaya
   kaydet (örn. `/tmp/theme-globals.json`; Adım 6'da `--tokens` girdisi). Var olan token
   asla duplike edilmez; isim çakışması varsa bile eşleşme **id ile** yapılır, name ile
@@ -43,6 +48,16 @@ listeyi yorumlayarak oku, prop default'ları token'lanmaz (onlar editör değeri
 
 ## Adım 3 — Token seti tasarımı (skill'in kalbi)
 
+**Önce mimari kararı ver:** MCP guide'ın önerdiği varsayılan, **color scheme (slot +
+palet)** mimarisidir — adlandırılmış slot'lar (`Background`, `Metin`,
+`PrimaryButton/Text`…) + slot→renk paletleri. Section editörden scheme seçer,
+component'ler slot cssVar'larını kullanır → merchant kod değişmeden re-skin yapar.
+Flat renk token'ları hâlâ geçerli (tek paletli tema, hızlı migration), ama iki fark
+bilinçli seçilmeli: (1) scheme slot değerleri `var(--<colorId>)` linked reference kabul
+eder — eski "alias katmanı" ihtiyacının modern karşılığı budur; (2) partner design asset
+taşınabilirliğinde **slot id'leri store'lar arası taşınır, flat renk id'leri taşınmaz**.
+Mimari kararı katalog önerisiyle birlikte kullanıcıya sun.
+
 Envanterden/spec'ten **temaya özgü** bir katalog önerisi çıkar:
 
 - **Adlandırma:** `"Grup/İsim"` — `/` editörde otomatik gruplar (örn. `Marka/Orman`,
@@ -63,23 +78,32 @@ KULLANICI ONAYI al. Onaysız `create_theme_global` çağrısı yapılmaz.**
 
 ## Adım 4 — Token'ları oluştur
 
-Onaylı katalogu `create_theme_global` ile aç (`kind: "color"` / `kind: "typography"`).
+Onaylı katalogu `create_theme_global` ile aç. Güncel kind'lar:
+`globalVariable | color | typography | breakpoint | keyframe | colorScheme`
+(`delete_theme_global` ek olarak `colorSchemeSlot` da siler — slot TÜM scheme'lerden
+cascade'li kaldırılır).
 
 | Tuzak | Kural |
 |---|---|
-| Color `cssVar` casing'i `id`'den FARKLI (örn. id `IMl0NDdlCA` → cssVar `var(--iMl0NDdlCa)`) | Dönen `cssVar` string'ini **birebir kopyala**; id'den asla elle türetme |
+| Referansları elle kurma hevesi | Dönen `id`/`cssVar`/`className`'i **birebir kopyala** (cssVar = `var(--<id>)`, className = `_<id>`; yine de dönen string esas alınır) |
 | `font_weight` fontun shiplemediği değerde reddedilir | `supportedFontWeights` listesine bak; emin değilsen `400` (italic: `"400i"`) |
-| Color token başka token'ı alias'layamaz | `value` her zaman somut renk (hex); `var(...)` reddedilir |
-| Var olan rengi değiştirme ihtiyacı | `update_theme_color` (cssVar sabit kalır) — delete+recreate YASAK |
-| Name'ler unique değil | Token takibi ve eşleştirme her zaman `id` ile |
+| Color token başka token'ı alias'layamaz | `value` her zaman somut renk; `var(...)` reddedilir. İSTİSNA: colorScheme slot değerleri literal renk YA DA `var(--<colorId>)` linked reference alabilir |
+| Var olan rengi değiştirme ihtiyacı | `update_theme_color` (cssVar sabit kalır) — delete+recreate YASAK. Scheme paleti: `update_theme_color_scheme` (slot bazında MERGE, `is_default` exclusive). Slot adı: `rename_theme_color_scheme_slot` (id sabit, binding kopmaz). `update_theme_global` YALNIZCA `globalVariable` (Theme Settings) içindir |
+| Name'ler unique değil | Token VE slot takibi/eşleştirme her zaman `id` ile (name-lookup bilinçli olarak yok) |
 
-Typography'de `className` = `_<id>` (casing sorunu yok). Her create sonucundaki
-id/cssVar/className'i not al — Adım 5'in girdisi.
+`_<id>` kalıbı üç yerde aynı: typography `className`, keyframe `ref` (animation-name),
+scheme palet `className`. Keyframe güncellemede `points` REPLACE semantiğidir (merge
+değil). Her create sonucundaki id/cssVar/className'i not al — Adım 5'in girdisi.
 
 ## Adım 5 — CSS/TSX'i bağla
 
 Temanın yapısına göre yöntem seç:
 
+- **Scheme mimarisi (önerilen):** component CSS'i slot cssVar'larını
+  (`var(--<slotId>)`) doğrudan kullanır ve palet `className`'i EKLENMEZ — className'siz
+  kullanım, section'ın editörde seçili scheme'ini inherit eder (guide'ın önerdiği
+  varsayılan mod). Palet className'i yalnızca bir bölgeyi bilerek başka palete
+  sabitlemek içindir.
 - **CSS-ağırlıklı tema (semantik alias katmanı):** `global.css` `:root` içinde
   `--<prefix>-orman: var(--<cssVar-adı>);` gibi alias'lar tanımla, component CSS'i
   alias'ları kullansın. Alias eklemeden önce hedefin katalogda **gerçekten var olan**
@@ -94,14 +118,20 @@ Bağlama kuralları:
   scoped component CSS'i (`.cc_x .y` = 0,2,0) onu EZER. Token class verilen elemanın
   component CSS'inden `font-family` satırını SİL; form kontrollerine (button/input/
   select/textarea — miras almazlar) `font-family: inherit` ver.
-- **`:root` kopyalama tuzağı:** build, `global.css`'teki `:root` bildirimlerini her
-  component'in scope köküne kopyalar. Runtime'da JS ile `documentElement`'e yazılan
-  bir değişkeni `:root`'ta tanımlama — kopya her scope sınırında mirası keser; onun
-  yerine her kullanımda `var(--x, fallback)` ver.
+- **Yükleme sırası:** global CSS unscoped'dur ve önce yüklenir (Global → Shared →
+  Component); değişkenler doğal cascade ile ulaşır, component CSS'i aynı property'yi
+  yazarsa kazanır. Runtime'da JS ile `documentElement`'e yazılan değişkenlere her
+  kullanımda `var(--x, fallback)` ver (SSR/ilk boyamada değer henüz yoktur).
+- **Media query'de tema breakpoint'i:** `var()` media query içinde çalışmaz — tek yol
+  `bp(<breakpointId>)` token'ı: `@media (max-width: bp(<id>))` render'da somut px'e
+  çevrilir; CSS'te referans verilen breakpoint asset dependency olarak otomatik taşınır.
 - **Canlı vs snapshot:** görsel her şeyde `cssVar`/`className` kullan (editör
-  düzenlemesi anında yansır); `resolved`/`value` render anı snapshot'ıdır.
+  düzenlemesi anında yansır); `resolved`/`width`/`value` render anı snapshot'ıdır,
+  canvas yenilenene dek gecikmesi bug değildir. `resolved`'ı inline style'a yayma.
 - Tema partner design asset olarak dağıtılacaksa: kodda hardcoded global-variable
-  key taşınmaz — ayrıntı için MCP `get_framework_guide("theme-globals")` Portability bölümü.
+  key ve flat renk token id'si taşınmaz — **scheme slot id'leri ise store'lar arası
+  aynen taşınır** (`var(--<slotId>)` portable). Ayrıntı: MCP
+  `get_framework_guide("theme-globals")` Portability bölümü.
 
 ## Adım 6 — Doğrulama akışı (bitiş kontrolü)
 
@@ -123,9 +153,14 @@ Bağlama kuralları:
 ## Sık hatalar
 
 - `list_theme_globals` çağırmadan token açmak → duplike katalog.
-- cssVar'ı id'den türetmek → sessizce çözülmeyen renk (belgelenmiş gerçek vaka).
+- `cssVar`/`className`/slot referansını elle kurmak veya name ile eşleştirmek →
+  dönen değeri kopyala, takip her zaman `id` ile.
 - Migration'da alias'ı bağlarken hedef token'ı doğrulamamak → dangling `var()`,
   tarayıcı satırı düşürür, hata da vermez.
 - Token class'ı ekleyip component CSS'indeki `font-family`'yi bırakmak → font
   "değişmiyor" şikâyeti.
+- Scheme mimarisinde her component'e palet `className`'i yapıştırmak → inherit
+  modunu kırar; section'ın editörden seçtiği scheme yansımaz olur.
+- Runtime'da `getThemeColorSchemes().schemes`'i iterate edip renkleri boş görmek →
+  `colorsByScheme` slot-id anahtarlıdır, oradan oku.
 - Kullanıcı onayı almadan katalog açmak → mağazada temizlenmesi gereken token çöplüğü.

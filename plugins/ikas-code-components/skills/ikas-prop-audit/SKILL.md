@@ -26,13 +26,17 @@ içindir; nihai kararı tüm dökümü okuyarak ver (bayraksız İngilizce ad da
 ## Değişmezler (asla dokunma)
 
 - `ikas.config.json`, `types.ts`, `global-types.ts` elle düzenlenmez — yalnızca
-  `npx ikas-component config update-prop / update-prop-group / add-prop-group` kullanılır.
-  (`update-prop` şunları destekler: `--displayName`, `--description`, `--group`.)
+  `npx ikas-component config update-prop / update-prop-group / add-prop-group /
+  move-prop-group` kullanılır. (`update-prop` şunları destekler: `--displayName`,
+  `--description`, `--group`.) Component kimliği için `--component-id` tercih edilir
+  (id'ler `config list-components` çıktısında; `--component` isimle exact-match ister).
 - Prop `name` ve grup `id` değişmez (kaynak kodu ve mevcut editör değerlerini kırar).
   Yalnızca görünen ad (`displayName`, grup `name`) ve `description` değişir.
 - `defaultValue` çevrilmez — o vitrin içeriğidir, editör etiketi değil. Bu görev yalnızca
   editör sidebar'ını kapsar.
 - Enum option `value`'ları değişmez; option görünen adları `update-enum` ile çevrilebilir.
+  `--options` formatı label→value objesidir ve seti KOMPLE değiştirir: tüm option'ları
+  Türkçe label + mevcut value ile yeniden yaz (örn. `'{"Küçük":"s","Büyük":"l"}'`).
 - Kaynak dosyalara (`index.tsx`, `styles.css`) dokunulmaz.
 
 ## Adım 2 — Kanonik Gruplama Şeması
@@ -43,7 +47,7 @@ içindir; nihai kararı tüm dökümü okuyarak ver (bayraksız İngilizce ad da
 
 | Sıra | id | Ad | İçerik |
 |---|---|---|---|
-| 1 | `data` | Veri | PRODUCT, CATEGORY, PRODUCT_LIST, PRODUCT_ATTRIBUTE bağları |
+| 1 | `data` | Veri | PRODUCT, CATEGORY, PRODUCT_LIST, PRODUCT_ATTRIBUTE ve diğer entity bağları (BRAND/BLOG/`*_LIST` türevleri dahil) |
 | 2 | `content` | İçerik | görsel, link, slot (COMPONENT/COMPONENT_LIST), başlık |
 | 3 | — | (işlevsel) | component'e özgü: Form, Sekmeler, Yolculuk, Durumlar, Banner 1… |
 | 4 | `texts` | Metinler | etiket/buton/boş-durum TEXT propları |
@@ -52,6 +56,8 @@ içindir; nihai kararı tüm dökümü okuyarak ver (bayraksız İngilizce ad da
 - Mevcut grup id'leri ne olursa olsun korunur (`appearance` id'li grup kalır, sadece adı
   "Renkler" yapılır). Yeni grup id'leri İngilizce camelCase, adları Türkçe.
 - İç içe grup en fazla 1 seviye ve yalnızca büyük alt-özellikler için (ör. sepet çekmecesi).
+- Sidebar'daki grup SIRASI tablodakine uymuyorsa `config move-prop-group` ile taşınır
+  (drag-and-drop eşdeğeri) — sıra düzeltmesi için config elle düzenlenmez.
 
 ## Adım 3 — Çeviri Kuralları
 
@@ -98,6 +104,7 @@ için script kaldığı yerden tekrar çalıştırılabilir. Örnek satırlar:
 npx ikas-component config update-prop-group --component "Header" --id cartDrawer --name "Sepet Çekmecesi"
 npx ikas-component config update-prop --component "Header" --prop cartDrawerTitle --displayName "Başlık"
 npx ikas-component config update-prop --component "ProductDetail" --prop sizeGuideAttribute --group data --description "Beden rehberi içeriğini sağlayan ürün özelliği."
+npx ikas-component config move-prop-group --component "Header" --id colors --index 4   # grubu sidebar'da sona taşı
 ```
 
 ## Adım 6 — Doğrulama (hepsi zorunlu)

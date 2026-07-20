@@ -47,6 +47,8 @@ Default order for a task:
 
 **MCP pointers in this skill (and in commerce.md) are starting points, not boundaries.** If the named tools don't answer your question, fall back to MCP discovery: `list_topics()`, `list_section_types()`, `list_examples()`, `list_functions("Category")`, `list_types(domain)`, `search_types(query)`, or the hybrid `search_docs(query)`. MCP is the source of truth; the pointers exist to save discovery cost, not to limit what you can query.
 
+Beyond the doc tools, MCP ships two workflow families this skill routes to: the **live-editor tools** (place sections on pages and fill their prop values — see Workflow C; always read `get_editor_workflow()` first) and the **migration tools** (`analyze_old_theme`, `plan_migration`, `get_migration_guide` — 16 topics, `get_section_migration_plan`) for porting an old-system theme; when the task is a migration, start from those instead of scaffolding blind.
+
 ## When to use
 
 - Building a new section component (`src/components/<Name>/`).
@@ -65,7 +67,7 @@ Open `references/commerce.md` with `Read` and jump to the referenced section —
 | Building a **new section** | commerce.md §13 catalogue entry (or derive from §3 + §5 if not catalogued) + §5 universal contract + relevant §7 behavior contracts + §8 placement constraints | Design source for layout / tokens / copy tone | MCP `get_section_template` → CLI `add-component` |
 | **Adding a prop** | commerce.md §6 (what to expose — mind §1 prop philosophy) + §13 entry | Only if the prop is a merchant-tunable visual lever | CLI `add-prop` (or `add-enum` first if ENUM, §6.5) |
 | **Removing a prop** | commerce.md §13 entry to confirm it's safe to drop | — | CLI `remove-prop`, then grep source for dead references |
-| **Composing a page** | commerce.md §8 + §4.3 | Design source decides ordering beyond §8's constraints | — |
+| **Composing a page** | commerce.md §8 + §4.3 | Design source decides ordering beyond §8's constraints | MCP `get_editor_workflow()` → `list_editor_pages` → `add_sections_to_page` / `update_page_sections` (needs `ikas-component dev` + connected editor) |
 | **Adding a chrome surface** (drawer/modal/toast) | commerce.md §9 entry + §7 for the triggering behavior + MCP `get_framework_guide("sub-component-catalog")` | Design source for panel visuals | Mount from the correct parent; wire triggers per §9 |
 | **Reviewing a section** | commerce.md §15 build checklist + §14 anti-patterns | Design source fidelity check | `npx ikas-component check --json` + `npx ikas-component build` |
 | **Custom ENUM lifecycle** | commerce.md §6.5 | — | CLI `add-enum` **before** any prop referencing it; `remove-enum` after all references are removed |
@@ -78,7 +80,7 @@ Open `references/commerce.md` with `Read` and jump to the referenced section —
 2. **Read commerce.md §5** (universal section contract) and confirm the section can satisfy it.
 3. **Get the design input.** Delivered design: read the screen / region and capture structure, tokens, copy. Otherwise: list the visual decisions this section needs and resolve them with the design authority.
 4. **Identify required custom ENUMs** (§6.5). Run `add-enum` first per `CLAUDE.md`; capture the returned id.
-5. **Get the MCP starter**: `get_section_template(sectionType)` — starter files, canonical prop list, the exact CLI `add-component` command, child file list (`get_section_child`). For surfaces with a pattern guide, read it too.
+5. **Get the MCP starter**: `get_section_template(sectionType)` — starter files, canonical prop list, child file list (`get_section_child`, or the `include` param to bundle subtrees inline). For **container sections** the template returns a multi-step **Setup Recipe** (create children first, capture their opaque `componentId`s, create the parent, wire `filteredComponentIds` via `update-prop`) — follow it in order, don't collapse it into one command. Check `list_section_types()` when unsure: besides sections it ships *Pattern* templates (`add-to-cart`, `bundle-products`, `variant-selection`, `product-pricing`, `navigation`, `image-handling`, `component-renderer`) — API reference implementations worth reading before hand-rolling those behaviors. For surfaces with a pattern guide, read it too.
 6. **Adapt the starter's prop surface per commerce.md §1 + §6.1** — expose editable content (TEXT / IMAGE / LINK / sources / inherently-optional toggles), drop knobs the design source has fixed, add props the design implies. Defaults must be shippable (§1).
 7. **Run the CLI `add-component` command.** Never hand-edit auto-generated files.
 8. **Look up storefront APIs** via MCP (`get_model_guide`, `get_function_doc`, `get_functions_for_type`) before writing data-access code.
@@ -99,8 +101,9 @@ Open `references/commerce.md` with `Read` and jump to the referenced section —
 
 1. **Read commerce.md §8** for the page's constraints (first product surface within one scroll, no marketing decoration on utilitarian pages, PDP rhythm, header/footer immovable) and §4.3 (composition decoupled from sections).
 2. **Ordering beyond those constraints comes from the design source** — not from a remembered "standard" rhythm.
-3. **Confirm mandatory surfaces are present** per §4.1 and the §13 entries of the sections used.
-4. **Confirm chrome triggers are wired** per §9 — one consistent ATC feedback pattern across the theme; search / mobile drawer triggers from header.
+3. **Place and fill via the MCP live-editor tools** (needs `ikas-component dev` + connected editor). Read `get_editor_workflow()` first — defining props (CLI) and filling values (editor tools) are different jobs with different value shapes. Typical flow: `list_editor_pages` → `import_section` (if not yet imported) → `add_sections_to_page` (places many and fills props in one call — prefer it) → `update_page_sections` for bulk content passes; `get_component_props` for the value blueprint, `get_section_values` for read-modify-write (mandatory before touching a COMPONENT_LIST). Entity ids come from `search_products` / `list_categories` / `list_brands` / `list_blogs`, page links from `get_page_by_type` / `create_page`, images from `upload_images`. `publish_theme` only when the user explicitly asks.
+4. **Confirm mandatory surfaces are present** per §4.1 and the §13 entries of the sections used.
+5. **Confirm chrome triggers are wired** per §9 — one consistent ATC feedback pattern across the theme; search / mobile drawer triggers from header.
 
 ### D. Adding a chrome surface (drawer / modal / toast / indicator)
 

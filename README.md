@@ -26,7 +26,7 @@ Güncelleme için:
 | Skill | Ne zaman kullanılır |
 |---|---|
 | [ikas-prop-audit](#ikas-prop-audit) | Bir projedeki tüm component'lerin prop/grup yapısını denetleyip toparlamak |
-| [ikas-theme-globals](#ikas-theme-globals) | Tema global renk/tipografi token setini kurmak, CSS/TSX'i token'lara bağlamak |
+| [ikas-theme-globals](#ikas-theme-globals) | Tema global renk/tipografi/color-scheme token setini kurmak, CSS/TSX'i token'lara bağlamak |
 | [ikas-theme-builder](#ikas-theme-builder) | Section/sub-component inşa etmek, prop eklemek, sayfa kompoze etmek, chrome surface kurmak |
 | [ikas-theme-audit](#ikas-theme-audit) | Mevcut bir temanın alışveriş deneyimini kural setine göre denetlemek (kod değiştirmez) |
 
@@ -75,11 +75,11 @@ skills/ikas-prop-audit/
 
 ### ikas-theme-globals
 
-Bir ikas Code Components temasında **renk ve tipografi global token setini** kurar,
-CSS/TSX'i token'lara bağlar ve doğrular. İki modu var: mevcut CSS'ten envanter çıkarıp
-token'a taşıyan **migration modu** ve sıfırdan tema için tasarım spec'inden ilerleyen
-**kurulum modu**. Token seti temanın kendi CSS diline göre tasarlanır; hazır katalog
-şablonu dayatılmaz.
+Bir ikas Code Components temasında **global token setini** (renk, tipografi, color
+scheme; gerekirse breakpoint/keyframe) kurar, CSS/TSX'i token'lara bağlar ve doğrular.
+İki modu var: mevcut CSS'ten envanter çıkarıp token'a taşıyan **migration modu** ve
+sıfırdan tema için tasarım spec'inden ilerleyen **kurulum modu**. Token seti temanın
+kendi CSS diline göre tasarlanır; hazır katalog şablonu dayatılmaz.
 
 **Tetikleyiciler:** tema global renk/tipografi token'ları, `create_theme_global`, design
 token migration, cssVar/className bağlama, hardcoded renk temizliği.
@@ -91,15 +91,17 @@ token migration, cssVar/className bağlama, hardcoded renk temizliği.
    zaman `id` ile yapılır).
 2. **Envanter** — migration modunda `scripts/inventory.py` hardcoded renk ve
    font-family/size/weight değerlerini frekans sıralı döker.
-3. **Token seti tasarımı** — envanterden temaya özgü katalog önerisi çıkar:
-   `"Grup/İsim"` adlandırması (Marka/Nötr/Vurgu iskeleti), yakın renklerin
-   tekilleştirilmesi, 3-6 tipografi rolü, WCAG AA kontrast kontrolü. **Katalog tablo
-   halinde sunulur ve kullanıcı onayı alınmadan hiçbir token oluşturulmaz** — token
-   oluşturmak mağaza-kalıcı bir yan etkidir.
-4. **Oluşturma** — onaylı katalog `create_theme_global` ile açılır. Kritik tuzaklar
-   SKILL.md'de tablolu: cssVar id'den türetilmez (dönen string birebir kopyalanır),
-   color token alias alamaz, değişiklik `update_theme_color` ile yapılır
-   (delete+recreate yasak).
+3. **Token seti tasarımı** — önce mimari kararı (önerilen: color scheme slot+palet
+   mimarisi; alternatif: flat renk token'ları), sonra envanterden temaya özgü katalog
+   önerisi: `"Grup/İsim"` adlandırması, yakın renklerin tekilleştirilmesi, 3-6
+   tipografi rolü, WCAG AA kontrast kontrolü. **Katalog tablo halinde sunulur ve
+   kullanıcı onayı alınmadan hiçbir token oluşturulmaz** — token oluşturmak
+   mağaza-kalıcı bir yan etkidir.
+4. **Oluşturma** — onaylı katalog `create_theme_global` ile açılır (kind:
+   globalVariable/color/typography/breakpoint/keyframe/colorScheme). Kritik tuzaklar
+   SKILL.md'de tablolu: dönen id/cssVar/className birebir kopyalanır, color token alias
+   alamaz (scheme slot'ları `var(--<colorId>)` linked referans alabilir), değişiklik
+   `update_theme_color` / `update_theme_color_scheme` ile yapılır (delete+recreate yasak).
 5. **Bağlama** — CSS-ağırlıklı temada `global.css`'te semantik alias katmanı,
    TSX-ağırlıklıda doğrudan `cssVar`/`className`. Tipografi specificity tuzağı ve
    `:root` kopyalama tuzağı için özel kurallar içerir.
@@ -150,8 +152,10 @@ gerçekleri (must) ile referans tema alışkanlıkları (preference) ayrıştır
 
 **İş akışları:** yeni section inşası (10 adım: §13 katalog → §5 kontrat → design input →
 ENUM → MCP template → prop yüzeyi → CLI scaffold → API lookup → implement → pre-flight),
-prop ekleme, sayfa kompozisyonu, chrome surface kurulumu, section review. Her görev
-tipinin "önce ne okunur → hangi design girdisi → hangi komut" karar matrisi SKILL.md'de.
+prop ekleme, sayfa kompozisyonu (MCP canlı editör araçlarıyla yerleştirme + içerik
+doldurma — `get_editor_workflow` → `add_sections_to_page` / `update_page_sections`),
+chrome surface kurulumu, section review. Her görev tipinin "önce ne okunur → hangi
+design girdisi → hangi komut" karar matrisi SKILL.md'de.
 
 **Bitiş kontrolü:** commerce.md §15 build checklist + design fidelity +
 `npx ikas-component check --json` + `build` temiz.
