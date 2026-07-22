@@ -111,7 +111,7 @@ The theme covers **page surfaces** and **chrome surfaces**. Every section belong
 | Account: Favorites | Saved products | Favorite Products |
 | Account: Auth | Sign in / up / recover | Login, Register, Forgot Password, Recover Password |
 | Content | Editorial pages | Blog List, Blog Detail, Blog Slider, Rich Text, Image+Text, FAQ |
-| Utility | Out-of-flow states | Search Results, 404 / Not Found |
+| Utility | Out-of-flow states | Search Results, 404 / Not Found, Guest Order Tracking |
 
 ### 4.2 Chrome surfaces (global, mounted outside page flow)
 
@@ -322,6 +322,11 @@ A card's ATC affordance follows this ladder — first matching rule wins:
 3. `/account` fallback
 
 The cart and favorites state merges if the customer had a guest session — no silent data loss.
+
+When the theme ships social sign-in, the Login surface also processes the OAuth **return**
+callback on mount (the provider redirects back to it) and applies the same success destination
+rules. Provider buttons alone are not enough — without the callback handler the round-trip
+dead-ends.
 
 #### Login failure
 
@@ -852,9 +857,15 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 
 All inherit:
 - Account Shell layout per the design source (sidebar / tabs / hub — whatever the design ships).
-- Auth gate (redirect to Login when unauthenticated).
+- Auth gate (redirect to Login when unauthenticated). **The gate waits for customer-store
+  hydration before deciding** — checking the customer before the store initializes bounces
+  logged-in users to Login. The inverse gate holds on auth pages: an already-logged-in user
+  landing on Login / Register / Forgot is redirected to the account surface.
 - Sign-out reachable from every account surface.
-- See `get_framework_guide("account-patterns")`.
+- See `get_framework_guide("account-patterns")`. ⚠️ Known-stale spots in that guide (tracked
+  in ikas-editor-monorepo#740): it shows public `customerStore.orders` / `customerStore.favoriteProducts`
+  store fields and a `deleteAddress(customerStore, addressId)` signature that don't exist —
+  trust `get_function_doc(...)` signatures over the guide's snippets.
 
 #### Account Dashboard
 
@@ -872,13 +883,15 @@ All inherit:
 
 #### Account Order Detail
 
-- **Mandatory features:** Order number + date + status banner; itemized lines (image, name, variant, qty, line total); shipping + billing address blocks; totals breakdown; tracking link (when shipped+); reorder CTA (optional).
-- **Optional features:** Cancel order CTA (when status allows); download invoice.
-- **MCP:** tracking data via `list_functions("OrderTracking")`; detail/totals via `list_functions("OrderDetail")`.
+- **Mandatory features:** Order number + date + status banner; itemized lines (image, name, variant, qty, line total); **multi-package rendering** — when the order ships in more than one package, lines group per package with a per-package status pill and per-package tracking info (single-package orders show tracking in the delivery block); shipping + billing address blocks; totals breakdown (subtotal → discount/campaign adjustment rows → shipping → total, via the order's formatted helpers); tracking link (when shipped+); reorder CTA (optional).
+- **Optional features:** **Refund request flow** (when the storefront allows it) — offer it only when the order has refundable items; the shopper picks per-line refund quantities, submits, and on success the order re-fetches and the panel closes; items already in a refund state leave the main list and render in their own section with per-item status badges. Cancel order CTA (when status allows); download invoice.
+- **Status semantics:** derive "active / delivered / returned / cancelled" groupings and any progress indicator from the real order status enum — do not carry over v1 status names. The enum values aren't in the MCP type index yet (read them from the package's `.d.ts`; tracked in ikas-editor-monorepo#740); statuses outside the progress mapping hide the progress indicator instead of guessing a step.
+- **MCP:** order resolution from the URL: `get_function_doc("getOrderDetailsOfPage")`. Refund family: `search_docs("refund")` (`isIkasOrderRefundable`, refundable/refunded item getters, per-line quantity setter, `refundOrder`) — note the per-line quantity write may not trigger a re-render on its own, and a successful refund requires re-fetching the order. Packages: `get_function_doc("getIkasOrderDisplayedPackages")`. Tracking data via `list_functions("OrderTracking")`; detail/totals via `list_functions("OrderDetail")`.
 
 #### Account Addresses
 
 - **Mandatory features:** Card list of saved addresses; default indicator; "Add address" → modal (§9.5); Edit / Delete per card; empty state.
+- **Optional features:** "Make default" action per card. There is no dedicated storefront API for it — the pattern is saving the customer with the address list re-mapped so only the target has `isDefault` (tracked for documentation in ikas-editor-monorepo#740).
 - **Interactions:** Add / Edit → modal; Delete → confirm step (inline confirm or `ConfirmModal`) → optimistic remove.
 
 #### Favorite Products
@@ -945,6 +958,14 @@ All inherit:
 - **Mandatory features:** Large heading (`<h1>`); subtitle; primary CTA → home; secondary CTA → search or contact.
 - **Optional features:** Featured products row.
 - **MCP starter:** `get_section_template("not-found-section")`.
+
+#### Guest Order Tracking (optional, recommended)
+
+- **Role:** Let a guest see their order without an account — a recovery path (§3 #7) for the largest post-purchase support driver ("where is my order?").
+- **Page surface:** Utility page; linked from Footer and/or order emails. No auth gate — open to guests and logged-in users alike.
+- **Mandatory features:** Email + order number form (storefront's order-tracking form lifecycle, validation per §7.6); on success, a **read-only** order view reusing the Account Order Detail anatomy (status, progress, line items with multi-package grouping, totals, delivery + payment blocks); not-found and generic-error states with merchant-editable copy; a "search another order" action that resets to the form.
+- **Excluded:** the refund flow — guests don't refund from this surface.
+- **MCP:** `list_functions("OrderTracking")` — note the submit returns the found order (or null), not a boolean like other form submits. No section template exists yet (ikas-editor-monorepo#740); derive from the Account Order Detail contract.
 
 ---
 
