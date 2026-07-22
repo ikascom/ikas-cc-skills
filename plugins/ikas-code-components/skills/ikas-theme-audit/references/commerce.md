@@ -567,7 +567,7 @@ If the design source ships a chrome surface differently (e.g. a full-page Search
 
 **Mount:** From Account Dashboard. **Trigger:** "Edit profile" CTA.
 
-**Feature surface:** Form (name, email, phone, password change). Field-level validation per §7.6. Success: modal closes, dashboard re-renders, toast.
+**Feature surface:** Form limited to the fields `getAccountInfoForm` exposes — first/last name, phone, marketing consent. Email is read-only display, not an editable field. **No password-change field:** the storefront account-info form has none; password changes go through Forgot / Recover Password (§7.2). Field-level validation per §7.6. Success: modal closes, dashboard re-renders, toast.
 
 > **(MCP)** Form lifecycle + functions (`getAccountInfoForm`, `initAccountInfoForm`, `setAccountInfoForm*`, `submitAccountInfoForm`): `get_framework_guide("account-patterns")`.
 
