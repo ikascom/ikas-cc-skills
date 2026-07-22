@@ -278,12 +278,25 @@ The interaction grammar of the theme. Behavior is invariant across visual design
 
 #### Add to cart
 
+- **Single gate.** The ATC action is gated by the storefront's add-to-cart eligibility check — it already accounts for required option values, stock, and overselling. Don't hand-roll a stock-only check: a variant with overselling enabled (`sellIfOutOfStock`) stays purchasable at zero stock, and a product with unfilled required options must not submit (§7.13).
 - **Optimistic.** Cart count badge increments immediately.
+- **Existing line merge.** Adding a variant already in the cart must not create a duplicate row — find the existing line and increase its quantity instead.
+- **Edit mode.** When the PDP is opened from a cart line's "edit" affordance (edit-line query param), the ATC CTA becomes an "Update this line" action instead of adding a new line — with its own TEXT prop pair for the label.
+- **Quantity limits.** When the product declares per-sales-channel min/max quantities, the stepper clamps to them and the initial quantity starts at the minimum. Limit violations render merchant-editable copy, not a silently unresponsive stepper.
 - **Feedback choice (design-dependent).** Pick one and apply consistently: (a) auto-open Cart Drawer if the design ships one and the user isn't on the Cart page, (b) success toast, (c) inline confirmation on the ATC button.
 - **Pending state.** ATC button reads `form.isSubmitting`-style state and renders `submittingButtonText`. Drawer / list rows reflecting the same line render `is-pending`.
-- **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Surface the specific `validationError` (`INSUFFICIENT_STOCK`, `INVALID_PRODUCT_OPTION_VALUES`) as user-facing copy.
+- **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Surface the specific `validationError` (e.g. `INSUFFICIENT_STOCK`, `INVALID_PRODUCT_OPTION_VALUES`) as user-facing copy — read the current value set from `get_function_doc("addItemToCart")`; the two examples here are not exhaustive.
 
-> **(MCP)** Result shape: `addItemToCart` returns `IkasCartOperationResult { success, validationError }` — the type is not in the type index, so read the shape from `get_function_doc("addItemToCart")` (not `get_type_definition`). Loading-flag pattern: `get_framework_guide("async-data-patterns")` §2.
+> **(MCP)** Result shape: `addItemToCart` returns `IkasCartOperationResult { success, validationError }` — the type is not in the type index, so read the shape from `get_function_doc("addItemToCart")` (not `get_type_definition`). Eligibility gate: `get_function_doc("isAddToCartEnabled")`. Line merge: `findExistingCartItem` / `changeItemQuantity`. Edit mode + quantity clamp reference implementation: `get_section_template("add-to-cart")`. Channel limit shape: `get_type_definition("IkasProductSalesChannel")`. Loading-flag pattern: `get_framework_guide("async-data-patterns")` §2.
+
+#### Add to cart from product cards (PLP, sliders, favorites, search)
+
+A card's ATC affordance follows this ladder — first matching rule wins:
+
+1. **Out of stock** → the card shows its OOS state and offers a recovery affordance: notify-me per §7.11, or navigation to the PDP. Never a silently dead button.
+2. **Bundle product** → navigate to the PDP; cards never quick-add bundles (§7.12).
+3. **Single variant, no option set** → direct ATC per the contract above.
+4. **Multiple variants or an option set** → open the Quick View surface (§9.6) or navigate to the PDP (design decision). Never silently add a default variant the shopper didn't choose.
 
 #### Update quantity, remove
 
@@ -338,9 +351,9 @@ The cart and favorites state merges if the customer had a guest session — no s
 - Selecting a variant pushes `variant` to the URL so the URL is shareable.
 - Gallery scrolls to the first image associated with the new variant (when variant images exist); does **not** reset to image 1.
 - Price, SKU, stock status, ATC button state update synchronously.
-- Out-of-stock variants are visually marked but still selectable; on selection, ATC reads `outOfStockButtonText` (e.g. "Out of stock — notify me").
+- Out-of-stock variants are visually marked but still selectable; on selection, ATC reads `outOfStockButtonText` and exposes the back-in-stock affordance per §7.11. (The design source may instead hide OOS values entirely — acceptable, as long as it can never leave the shopper on an unselectable dead combination.)
 
-> **(MCP)** `get_framework_guide("product-detail-patterns")`. Variant helpers: `get_model_guide("IkasProductVariant")`, `get_function_doc("selectVariantValue")`, `get_function_doc("getSelectedProductVariant")`. Notify-me on OOS has storefront support — `list_functions("BackInStock")`.
+> **(MCP)** `get_framework_guide("product-detail-patterns")`. Variant helpers: `get_model_guide("IkasProductVariant")`, `get_function_doc("selectVariantValue")`, `get_function_doc("getSelectedProductVariant")`. Notify-me on OOS: §7.11.
 
 ### 7.4 Pagination & filtering (PLP)
 
@@ -415,6 +428,45 @@ Track in-flight mutations by stable id (line item id, product id) so parallel mu
 - `Tab` order follows DOM order; never override with `tabindex > 0`.
 - Focus traps inside modals/drawers: focus stays within the open surface; returns to trigger on close.
 - `Enter` on a card link navigates; `Space` on a button triggers it.
+
+### 7.11 Out-of-stock recovery — back-in-stock ("notify me")
+
+Out of stock is a recovery surface (§3 #7), never a dead end. When the storefront enables back-in-stock notifications, the OOS ATC state becomes a notify-me affordance.
+
+- **Feature-gated.** Render the affordance only when the storefront reports back-in-stock enabled for the variant; otherwise the OOS state stands alone.
+- **Two branches, keyed to the login-required flag:**
+  - Login required + guest → route to Login with a return path (§7.2), don't show an email form.
+  - Login required + logged-in → save the reminder with the customer's email in one tap.
+  - Login not required → inline email form using the storefront's back-in-stock form lifecycle; validation per §7.6.
+- **Success is persistent state, not a toast alone.** The variant carries a saved-reminder flag — render a "we'll notify you" state and don't re-offer the form while it's set.
+- **Per-variant.** Re-evaluate on every variant change (§7.3): a different variant may be in stock, unsaved, or already saved.
+- **Cards may delegate.** A product card facing an OOS product may route to the PDP instead of hosting the form inline (§7.1 card ladder).
+- All copy (notify CTA, form labels, success state) = TEXT props (§5.4).
+
+> **(MCP)** Two function families exist — a form-based flow and a direct-save flow: `list_functions("BackInStock")` + `list_functions("Stock")`. Pick one, don't mix. The enabled / login-required / saved-reminder flags live on the variant: `get_model_guide("IkasProductVariant")`.
+
+### 7.12 Bundle products
+
+A variant can carry bundle settings (a composed set of sub-products sold as one line). Check for them via the storefront helper before rendering the standard single-product ATC.
+
+- **PDP renders the bundle's sub-products** — selection and per-item quantity editing per what the bundle settings allow.
+- **ATC eligibility widens:** it includes every sub-product's stock (respecting each one's own overselling flag) and the bundle's min/max quantity constraints. A violation blocks ATC **with a stated reason** (which sub-product, which limit) — not a silently disabled button.
+- **Cart lines for bundles render their sub-products**; editing a bundle line routes back to the PDP rather than editing inline.
+- **Cards never quick-add bundles** — navigate to the PDP (§7.1 card ladder).
+
+> **(MCP)** Reference implementation: `get_section_template("bundle-products")`. Canonical PDP entry point: `get_function_doc("initBundleProducts")`. Settings shape: `get_type_definition("IkasBundleSettings")`.
+
+### 7.13 Product options (personalization)
+
+When a product carries an option set (engraving text, uploaded artwork, date selection, add-on choices…), the PDP — and any Quick View surface — must render it; skipping it silently produces carts the merchant can't fulfill.
+
+- **Render every displayed option** in its declared type and display style; child options appear only when their parent's selection requires them. Don't cherry-pick the types the design happened to show — a merchant can attach any type to any product.
+- **Validation mirrors §7.6:** no errors before the first ATC attempt; after it, invalid options show their message and ATC stays blocked by the same single gate as §7.1.
+- **File options** upload through the storefront's upload function; constraint violations (extension, min/max file count) render merchant-editable error copy.
+- **Priced options** show their price on the label, and totals reflect them via storefront price helpers — no hand math (§11.1).
+- **After a successful ATC, option values reset** to their initial state.
+
+> **(MCP)** Function families: `list_functions("Customization")`, `list_functions("ProductOption")`, `list_functions("ProductOptionSet")`. Fetch/attach: `get_function_doc("getProductOptionSet")`. Reference validation flow: `get_section_template("add-to-cart")` (its option-set util).
 
 ---
 
@@ -526,7 +578,7 @@ If the design source ships a chrome surface differently (e.g. a full-page Search
 
 **Mount:** Optional, surfaced from PLP cards when the design ships a "Quick view" affordance.
 
-**Feature surface:** Compact PDP — smaller gallery + title + price + variant selector + ATC + "View full details" link. Does NOT include reviews, accordion, breadcrumbs, related products. ATC behavior per §7.1.
+**Feature surface:** Compact PDP — smaller gallery + title + price + variant selector + option set per §7.13 (when the product carries one) + ATC + "View full details" link. Does NOT include reviews, accordion, breadcrumbs, related products. ATC behavior per §7.1. Never opens for bundle products — those navigate to the PDP (§7.12).
 
 ### 9.7 Top Loading Indicator
 
@@ -659,7 +711,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Page surface:** Homepage; optionally PDP / Cart ("you may also like").
 - **Mandatory features:** Section title; product source via PRODUCT_LIST prop; carousel of product cards; per-card ATC label + submittingButtonText + OOS label + "View Product" label; card content via COMPONENT_LIST + `privateVarMap.product` passing each `product` to the children.
 - **Optional features (when the design ships them):** Multi-tab structure ("New in" / "Bestsellers" / "Sale") with auto-tab switch and per-tab "View all" CTA.
-- **Interactions:** Card click → PDP; card ATC → §7.1; favorite toggle.
+- **Interactions:** Card click → PDP; card ATC → §7.1 card ladder (OOS / bundle / variants decide between direct ATC, Quick View, and PDP); favorite toggle.
 - **A11y:** If tabs: `role="tablist"` / `role="tab"` / `role="tabpanel"` with arrow-key navigation.
 - **MCP starter:** `get_section_template("product-slider-section")` (single-source slider with `privateVarMap.product` wired through to card children).
 
@@ -721,9 +773,9 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 
 - **Role:** The decision surface; convert browsing into ATC.
 - **Page surface:** Product detail page, mandatory.
-- **Mandatory features:** Breadcrumbs (Home → Collection → Product); gallery (per the design's gallery mode); product title (`<h1>`); prices (current + compare-at when discounted); variant selectors per attribute; quantity stepper; Add to Cart CTA; favorite toggle; accordion (description, ingredients, shipping, returns — content via RICH_TEXT props).
-- **Optional features (when the design ships them):** Brand line; rating (read-only); badges (discount, OOS, "new"); SKU / barcode meta; tags; notify-me opt-in on OOS; size guide modal link; pre-order CTA label override; share buttons.
-- **Interactions:** Per §7.3 (variant select), §7.1 (ATC); favorite toggle optimistic.
+- **Mandatory features:** Breadcrumbs (Home → Collection → Product); gallery (per the design's gallery mode); product title (`<h1>`); prices (current + compare-at when discounted); variant selectors per attribute; quantity stepper (clamped per §7.1 when the product declares limits); Add to Cart CTA; back-in-stock affordance on OOS per §7.11; bundle rendering per §7.12 when the variant carries bundle settings; option set rendering per §7.13 when the product carries one; favorite toggle; accordion (description, ingredients, shipping, returns — content via RICH_TEXT props).
+- **Optional features (when the design ships them):** Brand line; rating (read-only); badges (discount, OOS, "new"); SKU / barcode meta; tags; size guide modal link; pre-order CTA label override; share buttons; stock urgency (visible stock count and/or "last N left" note with a NUMBER threshold); Buy Now CTA (successful ATC → navigate straight to checkout via the cart store's checkout URL); WhatsApp order CTA (prefilled message + product URL).
+- **Interactions:** Per §7.3 (variant select), §7.1 (ATC), §7.11 (OOS notify-me), §7.12 (bundles), §7.13 (options); favorite toggle optimistic.
 - **A11y:** `<h1>` is product title; variant groups use `<fieldset>` / `<legend>`; gallery uses `aria-roledescription`; ATC reads stock status via `aria-live` when it changes.
 - **MCP starter:** `get_section_template("product-detail-section")` — a slot-based shell (breadcrumb + gallery + COMPONENT_LIST info/bottom regions). The reference theme decomposes the info column into many small child components — match the design source's breakdown instead of copying the reference decomposition. See `get_framework_guide("product-detail-patterns")`.
 
@@ -923,6 +975,7 @@ These are violations. Theme PRs that introduce them should be rejected.
 21. **Design-canonical:** Adding layout / alignment / aspect-ratio / per-element color ENUMs to a section when the design source has already decided. Merchant control over visual structure conflicts with the canonical design.
 22. **Design-canonical:** Rewriting visual choices the design source made — replacing the palette, changing aspect ratios, swapping a designed layout for a "more standard" one — even when the change feels like a better default. The design source is canonical.
 23. **Design-canonical:** Inventing props from this doc instead of querying `get_section_template(...)`. The MCP template's prop list is the starting point; adapt it to the design, don't reconstruct it from prose.
+24. A dead out-of-stock button when the storefront has back-in-stock enabled — OOS must expose the §7.11 affordance (or route to the PDP, on cards).
 
 ---
 
@@ -946,4 +999,4 @@ Before merging a section:
 
 ---
 
-*Last updated: 2026-07-20 — verified against the live ikas-code-components MCP server.*
+*Last updated: 2026-07-22 — verified against the live ikas-code-components MCP server and the Ozy (v1) purchase-flow inventory.*
