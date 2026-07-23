@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ikas.config.json prop/grup envanteri — ikas-prop-audit skill'inin denetim aracı.
+"""ikas.config.json prop/grup envanteri — ikas-prop-normalize skill'inin denetim aracı.
 
 Kullanım: python3 audit.py [ikas.config.json yolu]
 Çıktı: her component'in grupları ve propları; İngilizce görünümlü adlar EN?,

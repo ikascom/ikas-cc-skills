@@ -1,9 +1,10 @@
 ---
-name: ikas-prop-audit
-description: Use when auditing or tidying prop/propGroup structure in an ikas Code Components project — organizing prop groups, translating English displayNames and group names to Turkish, adding minimal editor descriptions. Triggers - prop gruplama, displayName Türkçeleştirme, ikas.config.json prop düzeni, editör sidebar temizliği.
+name: ikas-prop-normalize
+description: Use when normalizing the prop/propGroup structure of an ikas Code Components project — REWRITES ikas.config.json via CLI to apply canonical grouping, Turkish displayNames and minimal editor descriptions. Pass the `audit` argument for a read-only inventory + change list instead. Triggers - prop gruplama, displayName Türkçeleştirme, ikas.config.json prop düzeni, editör sidebar temizliği.
+context: fork
 ---
 
-# ikas Prop/Grup Denetimi
+# ikas Prop/Grup Normalizasyonu
 
 Bir ikas Code Components projesindeki TÜM component'lerin prop/grup yapısını tek geçişte
 tutarlı hale getirir: kanonik gruplama + Türkçe adlar + yalnızca gerekli yerde açıklama.
@@ -11,6 +12,21 @@ Sonuç: mağaza sahibinin editör sidebar'da gördüğü her etiket Türkçe, ö
 ve kendini açıklar durumda.
 
 **Temel ilke: envanter gözle değil script'le çıkarılır; her değişiklik CLI ile yapılır.**
+
+## Çağrı modları
+
+| Çağrı | Kapsam |
+|---|---|
+| (argümansız) | Tam geçiş: Adım 1 → 6. `ikas.config.json` (ve türetilen `types.ts` / `global-types.ts`) değişir. |
+| `audit` | Adım 1-4 yalnızca **planlama** olarak: envanteri çıkar, hangi component'te ne değişeceğini listele, DUR. Adım 5 (uygulama) ve Adım 6 atlanır — tek bir `ikas-component config` komutu çalıştırılmaz. |
+
+`audit` modunun çıktısı bir tablodur: `component | prop veya grup | mevcut → önerilen |
+gerekçe (hangi kural)`. Sonunda toplam değişiklik sayısını ve "uygulamak için argümansız
+çağır" cümlesini yaz.
+
+`audit` modunda `audit.py`'yi çalıştırmak serbest ve zaten gereklidir — okur, değiştirmez.
+Yasak olan tek şey `config update-prop` / `update-prop-group` / `add-prop-group` /
+`move-prop-group` / `update-enum` çağırmaktır.
 
 ## Adım 1 — Deterministik Envanter
 

@@ -15,6 +15,12 @@ framework gerçeklerini oradan doğrula.
 **Temel ilke: envanter ve doğrulama script'le (deterministik), token seti kararı
 kullanıcı onayıyla.** Token oluşturmak mağaza-kalıcı bir yan etkidir; onaysız yapılmaz.
 
+> **Adım 1-3 devredilebilir.** Envanter + katalog önerisi salt-okunur bir iştir ve
+> `ikas-theme-globals-inventory` skill'i (izole subagent) olarak koşturulabilir; geriye
+> onaya hazır bir katalog raporu döner. O raporu kullanıcı onayladıysa buraya **Adım 4'ten**
+> gir. Devredilmediyse Adım 1'den normal ilerle. Onay her hâlükârda kullanıcıdan alınır —
+> inventory skill'i onay veremez, yalnızca önerir.
+
 ## Ön koşullar
 
 - `ikas-component dev` çalışıyor VE editör tarayıcıda bağlı olmalı (TÜM MCP

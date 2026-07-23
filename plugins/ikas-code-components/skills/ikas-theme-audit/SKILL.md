@@ -1,6 +1,10 @@
 ---
 name: ikas-theme-audit
 description: Use when auditing an existing ikas storefront theme's shopper experience — checking for missing page/chrome surfaces, incomplete or wrong flows, weak recovery paths, silent failures, or merchant-control gaps. Triggers on "temayı denetle", "audit this theme", "eksik section var mı", "chrome surface'lar tam mı", "akışlar doğru mu", "experience review", "pre-launch review", "bu tema yayına hazır mı".
+context: fork
+allowed-tools: Read, Grep, Glob
+model: opus
+effort: high
 ---
 
 # ikas Theme Audit

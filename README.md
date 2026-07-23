@@ -12,7 +12,7 @@ marketplace özelliğiyle dağıtılır.
 ```
 
 Kurulumdan sonra skill'ler otomatik olarak kullanılabilir olur; Claude ilgili bir görevle
-karşılaştığında skill'i kendisi devreye alır, `/ikas-prop-audit` gibi komutla elle de
+karşılaştığında skill'i kendisi devreye alır, `/ikas-prop-normalize` gibi komutla elle de
 çağrılabilir.
 
 Güncelleme için:
@@ -25,14 +25,15 @@ Güncelleme için:
 
 | Skill | Ne zaman kullanılır |
 |---|---|
-| [ikas-prop-audit](#ikas-prop-audit) | Bir projedeki tüm component'lerin prop/grup yapısını denetleyip toparlamak |
+| [ikas-prop-normalize](#ikas-prop-normalize) | Bir projedeki tüm component'lerin prop/grup yapısını kanonik şemaya oturtmak (config'i değiştirir; `audit` argümanıyla salt-okunur) |
 | [ikas-theme-globals](#ikas-theme-globals) | Tema global renk/tipografi/color-scheme token setini kurmak, CSS/TSX'i token'lara bağlamak |
+| [ikas-theme-globals-inventory](#ikas-theme-globals-inventory) | Token envanterini çıkarıp onaya hazır katalog önerisi döndürmek (hiçbir şey oluşturmaz) |
 | [ikas-theme-builder](#ikas-theme-builder) | Section/sub-component inşa etmek, prop eklemek, sayfa kompoze etmek, chrome surface kurmak |
 | [ikas-theme-audit](#ikas-theme-audit) | Mevcut bir temanın alışveriş deneyimini kural setine göre denetlemek (kod değiştirmez) |
 
 ---
 
-### ikas-prop-audit
+### ikas-prop-normalize
 
 Bir ikas Code Components projesindeki **tüm** component'lerin prop/grup yapısını tek geçişte
 tutarlı hale getirir: kanonik gruplama, Türkçe görünen adlar ve yalnızca gerekli yerde
@@ -63,10 +64,14 @@ düzeni, editör sidebar temizliği.
 **Değişmezler:** prop `name` ve grup `id` asla değişmez; `defaultValue` (vitrin içeriği)
 çevrilmez; kaynak dosyalara (`index.tsx`, `styles.css`) dokunulmaz.
 
+**Salt-okunur mod:** `/ikas-prop-normalize audit` — envanteri çıkarır ve planlanan
+değişiklik listesini tablo olarak döner, hiçbir CLI komutu çalıştırmaz. Uygulamak için
+argümansız çağrılır.
+
 **İçerik:**
 
 ```
-skills/ikas-prop-audit/
+skills/ikas-prop-normalize/
 ├── SKILL.md          # iş akışı, kurallar, çeviri tablosu, sık hatalar
 └── scripts/audit.py  # deterministik prop/grup envanter script'i
 ```
@@ -112,6 +117,10 @@ token migration, cssVar/className bağlama, hardcoded renk temizliği.
 **Değişmezler:** onaysız `create_theme_global` çağrısı yapılmaz; token eşleştirme name
 ile değil `id` ile; cssVar asla elle türetilmez; var olan token silinip yeniden açılmaz.
 
+**Salt-okunur yarısı:** Adım 1-3 (envanter + katalog önerisi) ayrı bir skill'e
+devredilebilir — [ikas-theme-globals-inventory](#ikas-theme-globals-inventory). Onay
+alındıktan sonra bu skill Adım 4'ten devam eder.
+
 **İçerik:**
 
 ```
@@ -120,6 +129,34 @@ skills/ikas-theme-globals/
 └── scripts/
     ├── inventory.py       # hardcoded renk/tipografi envanteri (frekans sıralı)
     └── verify.py          # dangling var() + hardcoded kalıntı + class eşleşme raporu
+```
+
+---
+
+### ikas-theme-globals-inventory
+
+`ikas-theme-globals`'ın **karar öncesi, salt-okunur yarısı.** Temanın gerçek CSS/TSX
+kullanımından token envanterini çıkarır ve onaylanmaya hazır bir katalog önerisi döndürür.
+Hiçbir token oluşturmaz, değiştirmez, silmez — `create_theme_global` ve CLI create
+komutları kapsamı dışındadır.
+
+**Tetikleyiciler:** token envanteri çıkar, design system dokümanı çıkar, hangi renkler
+kullanılmış, token katalog önerisi, hardcoded renk taraması.
+
+**Nasıl çalışır:** mevcut katalogu çeker (`list_theme_globals`, editör yoksa CLI
+eşdeğeri) → `inventory.py` ile kod envanterini çıkarır → komşu renkleri tekilleştirip
+tipografiyi 3-6 role indirir → mimari önerisi (scheme vs flat), renk/tipografi katalog
+tabloları, kapsam dışı bırakılanlar ve WCAG AA kontrast uyarılarından oluşan bir rapor
+döner.
+
+Rapor onaylanırsa uygulama `ikas-theme-globals` Adım 4'ten devam eder. Script'i kopyalamaz,
+kardeş skill'in `scripts/inventory.py` dosyasını çalıştırır.
+
+**İçerik:**
+
+```
+skills/ikas-theme-globals-inventory/
+└── SKILL.md          # envanter akışı, katalog tasarım kuralları, rapor sözleşmesi
 ```
 
 ---
