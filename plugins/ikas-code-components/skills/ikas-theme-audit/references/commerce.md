@@ -75,7 +75,7 @@ The `ikas-code-components` MCP server is the source of truth for **all framework
 ### Two kinds of MCP content — distinguish them
 
 - **Framework facts (must):** API signatures, prop types, model fields, function return shapes, enum values, the auto-validate-after-submit rule, "root sections are auto-reactive (don't wrap in `observer()`)", `IkasCartOperationResult.validationError` enum values, `Router` method names. **Non-negotiable.**
-- **Reference-theme conventions (preference):** What the production `serel` reference theme chose — tab-based account dashboard, ToastContainer mounted from Header, CartPage without a separate Cart Drawer, two-slot Product Detail composition. **One valid design.** The incoming design source may pick differently — follow the design.
+- **Reference-theme conventions (preference):** What the production ikas reference theme chose — tab-based account dashboard, ToastContainer mounted from Header, CartPage without a separate Cart Drawer, two-slot Product Detail composition. **One valid design.** The incoming design source may pick differently — follow the design.
 
 Never violate framework facts (e.g. omitting `backgroundColor`, hand-formatting prices instead of `formattedPrice`, wrapping a section root in `observer()`). Freely deviate from reference-theme conventions when the design source asks for it.
 
@@ -1020,4 +1020,4 @@ Before merging a section:
 
 ---
 
-*Last updated: 2026-07-22 — verified against the live ikas-code-components MCP server and the Ozy (v1) purchase-flow inventory.*
+*Last updated: 2026-07-22 — verified against the live ikas-code-components MCP server and a production ikas theme's purchase-flow inventory.*

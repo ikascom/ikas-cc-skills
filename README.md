@@ -202,7 +202,7 @@ design girdisi → hangi komut" karar matrisi SKILL.md'de.
 ```
 skills/ikas-theme-builder/
 ├── SKILL.md                    # karar matrisi, görev iş akışları, pre-flight kontroller
-└── references/commerce.md      # tasarımdan bağımsız e-ticaret kural seti (~940 satır)
+└── references/commerce.md      # tasarımdan bağımsız e-ticaret kural seti (~1000 satır)
 ```
 
 ---

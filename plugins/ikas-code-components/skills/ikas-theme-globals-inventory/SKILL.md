@@ -33,7 +33,7 @@ taşı. Eşleştirme her zaman **id** ile yapılır, name ile değil (name'ler u
 ## Adım 2 — Kod envanteri
 
 ```bash
-python3 <kardeş-skill-dizini>/../ikas-theme-globals/scripts/inventory.py <proje-kökü> > /tmp/token-inventory.txt
+python3 <plugin-skills-dizini>/ikas-theme-globals/scripts/inventory.py <proje-kökü> > /tmp/token-inventory.txt
 ```
 
 (Script aynı plugin içindeki `ikas-theme-globals/scripts/inventory.py` dosyasıdır —

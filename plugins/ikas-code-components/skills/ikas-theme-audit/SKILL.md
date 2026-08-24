@@ -56,7 +56,7 @@ For each section present, open its **§13 catalogue entry** and check the **Mand
 
 ### Pass 4 — Anti-pattern sweep
 
-Scan the theme against **§14** — read the list from the file, don't recall it. Experience-level items (#1–#17) are in scope; purely framework items (#19, #20, #23) are out of scope here — note them in one line for a follow-up code review, don't expand.
+Scan the theme against **§14** — read the list from the file, don't recall it. Experience-level items (#1–#18, #24) are in scope, as are the design-canonical items (#21, #22) when a design source exists; purely framework items (#19, #20, #23) are out of scope here — note them in one line for a follow-up code review, don't expand.
 
 ### Pass 5 — Merchant reality check
 
