@@ -248,3 +248,7 @@ skills/ikas-theme-audit/
 > **Not:** `commerce.md` iki skill'de bilinçli olarak duplike edilmiştir — her skill
 > kendi başına taşınabilir. Kural setinde değişiklik yapılırsa **iki kopya birden**
 > güncellenmelidir.
+
+## Lisans
+
+[MIT](LICENSE) © İKAS TEKNOLOJİ A.Ş.
