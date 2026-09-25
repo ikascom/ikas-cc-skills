@@ -18,11 +18,20 @@ Kurulumdan sonra skill'ler otomatik olarak kullanılabilir olur; Claude ilgili b
 karşılaştığında skill'i kendisi devreye alır, `/ikas-theme-audit` gibi komutla elle de
 çağrılabilir.
 
-Güncelleme için:
+## Güncelleme
 
-```
-/plugin marketplace update ikas-cc-skills
-```
+Üçüncü parti marketplace'lerde otomatik güncelleme **varsayılan olarak kapalıdır**. Bu
+yüzden yeni sürümler kendiliğinden gelmez. İki yol var:
+
+- **Otomatik (önerilen):** `/plugin` → **Marketplaces** → `ikas-cc-skills` → **Enable
+  auto-update**. Güncelleme gelince session içinde bir uyarı görünür; `/reload-plugins`
+  ile uygulanır.
+- **Elle:** terminalde
+  ```
+  claude plugin update ikas-code-components@ikas-cc-skills
+  ```
+  `/plugin marketplace update ikas-cc-skills` yalnızca marketplace listesini yeniler,
+  kurulu plugin'i güncellemez.
 
 ## Birlikte çalışırlar
 
