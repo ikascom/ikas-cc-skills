@@ -44,7 +44,7 @@ What does **not** change: behavior contracts, recovery paths, optimistic UI, acc
 
 ### Default values reflect the design
 
-A merchant installing this theme with zero edits should see **the design source**. That means default copy = the design's copy, default images = the design's images (or close licensable placeholders), default product / category sources = sensible seeds (e.g. first published collection), default `backgroundColor` = the section's designed background. Defaults are non-negotiable: shippable on install.
+A merchant installing this theme with zero edits should see **the design source**: default copy = the design's copy, default `backgroundColor` = the section's designed background, default links = real destinations. Merchant-data props (images, product / category / brand / blog sources) can't carry a config default (`get_prop_types()`): fill them after placing the section (`get_editor_workflow()`), and render a deliberate state while empty. Defaults are non-negotiable: shippable on install.
 
 ---
 
@@ -54,30 +54,22 @@ The `ikas-code-components` MCP server is the source of truth for **all framework
 
 **Calibration rule (also for editing this doc):** this doc states what a surface must DO and points at MCP for shapes. When tempted to quote a signature, field list, or child count here, write a pointer instead — in practice, every fact this doc has ever gotten wrong was a quoted shape; the behavior contracts don't rot.
 
-| MCP tool | Returns | Use when |
-|---|---|---|
-| `list_section_types()` | The section types available as templates | Discovering what's pre-built |
-| `get_section_template(sectionType)` | Production starter: config snippet + working source files + the CLI setup steps (container sections get a multi-step **Setup Recipe** — children first, capture opaque ids, then wire the parent) + child lists; an `include` param bundles subtrees inline | **Always**, before scaffolding any section |
-| `get_section_child(section, name, kind)` | The full files of one child / component / sub-component under a section template | When extending a section with its child |
-| `list_topics()` / `get_framework_guide(topic)` | Framework guides — `ai-workflow`, `common-pitfalls`, `prop-types`, `prop-groups`, `css-scoping`, `form-handling`, `async-data-patterns`, `component-renderer-patterns`, `private-var-map`, `sub-component-catalog`, `custom-enums`, `theme-globals`, `image-handling`, `page-composition`, `global-css`, plus pattern guides: `product-detail-patterns`, `product-list-patterns`, `cart-patterns`, `account-patterns`, `header-footer-patterns`, `review-patterns`, `slider-overlay-patterns`, `blog-patterns`, `navigation-patterns` — the list grows; `list_topics()` is the source of truth | Before writing CSS, prop wiring, forms, async data, slot rendering, navigation |
-| `get_prop_types()` | All ikas.config.json prop types with TS types and examples | When deciding the type of a new prop |
-| `get_model_guide(model)` | A model's full TS type definition + every utility function with summary + every related type + the import statement | Before reading from any storefront model |
-| `get_type_definition(name)` / `search_types(query)` / `list_types(domain?, kind?)` | Full TS type / enum definitions, ranked matches, filtered listings | Type / enum discovery |
-| `list_functions(category?)` / `get_function_doc(name)` / `get_functions_for_type(typeName)` | Function inventory and per-function docs | Before calling any storefront function |
-| `search_docs(query)` | Hybrid search across functions + framework topics + types | When you don't know which tool to call |
-| `get_editor_workflow()` + the live-editor tool family (`add_sections_to_page`, `update_page_sections`, `get_component_props`, `get_section_values`, entity lookups, `upload_images`, `publish_theme` — guarded) | Placing sections on editor pages and filling their prop **values** (define-props vs fill-values are different jobs); the workflow doc enumerates the family, tool sequence, and per-type value shapes. Requires `ikas-component dev` + connected editor | Composing a page / filling content — read `get_editor_workflow()` first |
-| Theme-global tools (`list_theme_globals`, `create_theme_global`, `update_theme_color`, `update_theme_color_scheme`, `update_text_style`, `update_theme_breakpoint`, `update_theme_keyframe`, …) | Store-persistent design tokens: colors, typography, color schemes, breakpoints, keyframes | Token work — route to the `ikas-theme-globals` skill |
-| Migration tools (`analyze_old_theme`, `plan_migration`, `get_migration_guide`, `get_migration_example`, `get_section_migration_plan`) | Old-system theme → Code Components migration workflow | Migrating an existing theme |
-| `get_code_example(task)` / `list_examples()` | API usage examples extracted from a production theme (the registry can be empty on some servers — fall back to function docs) | When a function doc alone isn't enough |
+Where to start, by job. MCP discovery is the source of truth, and this list is only a shortcut:
 
-**Pointers are starting points, not boundaries.** When the listed tools don't answer your question, fall back to discovery (`list_topics()`, `list_section_types()`, `search_docs(query)`). MCP wins over this doc.
+- **Discovery:** `list_topics()`, `list_section_types()`, `list_examples()`, `search_docs(query)`.
+- **Scaffolding a section:** `get_section_template(type)`, always before `add-component`. Container sections ship a multi-step Setup Recipe; follow it in order.
+- **Storefront code:** `get_model_guide(model)`, `get_function_doc(name)`, `get_framework_guide(topic)`. Pattern guides exist per surface (product-detail, cart, account, header-footer…).
+- **Placing and filling sections in the editor:** read `get_editor_workflow()` first. Defining props and filling their values are different jobs.
+- **Login / register / account pages:** the ready-made page tools (§4.4), checked before scaffolding.
+- **Design tokens:** `list_theme_globals` and the theme-global tools, via the `ikas-theme-globals` skill.
+- **Old-system theme migration:** `get_migration_guide("iterative-workflow")`.
 
 ### Two kinds of MCP content — distinguish them
 
-- **Framework facts (must):** API signatures, prop types, model fields, function return shapes, enum values, the auto-validate-after-submit rule, "root sections are auto-reactive (don't wrap in `observer()`)", `IkasCartOperationResult.validationError` enum values, `Router` method names. **Non-negotiable.**
-- **Reference-theme conventions (preference):** What the production ikas reference theme chose — tab-based account dashboard, ToastContainer mounted from Header, CartPage without a separate Cart Drawer, two-slot Product Detail composition. **One valid design.** The incoming design source may pick differently — follow the design.
+- **Framework facts (must):** API signatures, prop types, model fields, function return shapes, enum values, reactivity rules (e.g. root sections are not wrapped in `observer()`). **Non-negotiable.**
+- **Reference-theme conventions (preference):** What the production ikas reference theme chose — the "(Serel Reference)" guides and `get_framework_guide("real-world-architecture")`, e.g. a tab-based account dashboard or a two-slot Product Detail. **One valid design.** The incoming design source may pick differently — follow the design.
 
-Never violate framework facts (e.g. omitting `backgroundColor`, hand-formatting prices instead of `formattedPrice`, wrapping a section root in `observer()`). Freely deviate from reference-theme conventions when the design source asks for it.
+Never violate framework facts (e.g. omitting `backgroundColor`, hand-formatting prices instead of using the storefront's formatted-price helpers, wrapping a section root in `observer()`). Freely deviate from reference-theme conventions when the design source asks for it.
 
 ---
 
@@ -113,6 +105,8 @@ The theme covers **page surfaces** and **chrome surfaces**. Every section belong
 | Content | Editorial pages | Blog List, Blog Detail, Blog Slider, Rich Text, Image+Text, FAQ |
 | Utility | Out-of-flow states | Search Results, 404 / Not Found, Guest Order Tracking |
 
+The Account and Auth rows can be covered by **ikas ready-made pages** instead of sections (§4.4). A surface counts as covered when either a section or an enabled ready-made page serves it.
+
 ### 4.2 Chrome surfaces (global, mounted outside page flow)
 
 | Surface | Mount point | When it appears |
@@ -133,6 +127,20 @@ Sections may **trigger** chrome surfaces; they never **embed** them. If the desi
 ### 4.3 Page composition is decoupled from sections
 
 A "page" is a merchant-arranged sequence of sections. **Only Header and Footer are immovable.** Page rhythm is the design source's decision, subject to the few UX constraints in §8.
+
+### 4.4 Ready-made account & membership pages
+
+ikas renders two page groups with its own components: **membership** (login, register, forgot / recover password, email verification) and **account** (my account, orders, order detail, addresses, favorites). They work out of the box and are customized through props (logo, palette, texts), not code.
+
+- **Default:** ready-made first. MCP enforces the ask-the-user gate. Build these surfaces as sections only when the user chooses a custom design.
+- **No theme header / footer by design:** a ready-made page draws its own top bar (logo, back-to-store link) and account nav. Placing the theme's header / footer there is the merchant's choice, not a §14 #13 violation.
+- **Ownership when ready-made:** the platform owns the internal behavior. That covers the §7.2 form rules, the §13.B auth entries, the §13.C account entries and the §9.4 / §9.5 modals, and none of it is audited as theme code. The theme still owns:
+  - **Entry points:** header account icon, favorites heart, guest favorite / review gates → auth, with a return path per §7.2.
+  - **Branding:** shared-scope logo and colors, preferably bound to theme color tokens.
+  - **Copy:** merchant-editable per locale.
+- **Ownership when custom:** everything in §7.2, §13.B and §13.C applies to the theme's sections in full.
+
+> **(MCP)** `list_ready_made_pages()` (groups, enabled state, shared scopes, per-page prop schema), `enable_ready_made_pages(group, enabled)`, `update_ready_made_page_prop(...)`.
 
 ---
 
@@ -221,32 +229,56 @@ Every image-bearing prop ships as:
 
 The image's aspect ratio, fit, position, overlay opacity — these are design decisions, not props. (Exception: if the design explicitly supports merchant-tunable overlay opacity for a hero, `imageOverlayOpacity` NUMBER is fine.)
 
-The prop-type catalog goes beyond single images: `IMAGE_LIST`, `VIDEO`, `SVG` / `SVG_LIST` (editor-sanitized; render via `normalizeSvg`), `DATE`, `NUMBER_RANGE`, and `*_LIST` entity sources (`CATEGORY_LIST`, `BRAND_LIST`, `BLOG_LIST`, `BLOG_CATEGORY_LIST`, `PRODUCT_ATTRIBUTE_LIST`) all exist — check `get_prop_types()` before inventing a workaround with TEXT props.
+The prop-type catalog is wider than single images (image lists, video, inline SVG, dates, ranges, list forms of every entity source) — check `get_prop_types()` before inventing a workaround with TEXT props.
 
-> **(MCP)** Image rendering helpers (`getDefaultSrc`, `getThumbnailSrc`, `getSrc`, `createMediaSrcset`): `get_functions_for_type("IkasImage")`.
+> **(MCP)** Image rendering helpers: `get_functions_for_type("IkasImage")` + `get_framework_guide("image-handling")`.
 
-### 6.3 Prop group vocabulary
+### 6.3 Editor sidebar schema (groups, labels, descriptions)
 
-Recommended starting points for top-level group ids. MCP section templates use this vocabulary plus context-specific variants; match the template when starting from one.
+The single source for how props look in the editor sidebar. `ikas-theme-builder` applies it when creating props. `ikas-prop-normalize` applies it in bulk to existing projects. Editor labels (`displayName`, group names, descriptions, ENUM option labels) are **Turkish**. Prop `name`s stay English camelCase; new group ids are English kebab-case (the CLI's format).
 
-| Group id | Display name | Contains |
-|---|---|---|
-| `content` | Content | TEXT, RICH_TEXT, IMAGE props that fill the section |
-| `texts` | Texts | When the section has 5+ TEXT props that share no other group |
-| `behavior` | Behavior | BOOLEAN toggles, NUMBER limits |
-| `links` | Links | Standalone LINK props (when 2+; otherwise inline with content) |
-| `data` | Data | PRODUCT_LIST / CATEGORY / BLOG sources |
-| `advanced` | Advanced | Rarely-edited (e.g. `backgroundColor` when the design has already chosen it) |
+**When to group:** a component with ≤4 props stays flat. At ≥5 props, every prop sits in a group. Nest at most one level deep.
 
-Sub-groups allowed one level deep. **The `appearance` and `layout` groups are typically empty** when visual decisions come from a canonical design — most colors and all layout variants live in the design, not in the editor.
+**Groups, in sidebar order** (open only the ones needed). Each group answers one question the merchant asks:
+
+| # | id | Label | Merchant's question | Holds |
+|---|---|---|---|---|
+| 1 | `data` | Veri | "Hangi ürünler / kategoriler görünsün?" | Entity sources: PRODUCT, PRODUCT_LIST, CATEGORY, BRAND, BLOG, PRODUCT_ATTRIBUTE and their `*_LIST` forms |
+| 2 | `content` | İçerik | "Bu bölümde ne yazsın, ne görünsün?" | Storefront content that changes per placement: headings, body copy (TEXT / RICH_TEXT), IMAGE + alt, VIDEO, SVG, LINK, COMPONENT / COMPONENT_LIST slots |
+| 3 | feature id | *(feature name)* | "Şu parça nasıl çalışsın?" | Every non-COLOR prop of one **feature** — a distinct UI part the merchant would name: Galeri, Form, Geri Sayım, Akordeonlar, Sepet Çekmecesi, Banner 1… Opened only when the feature has **≥3 non-COLOR props**; with fewer, its props spread into the type-based groups |
+| 4 | `behavior` | Ayarlar | "Neler açık / kapalı, kaç tane?" | BOOLEAN, NUMBER, NUMBER_RANGE, ENUM and TYPE style props that belong to no feature group |
+| 5 | `texts` | Metinler | "Arayüz ne desin?" | UI strings reused across states: button / label / placeholder text, empty / loading / error copy, aria labels |
+| 6 | `colors` | Renkler | — | **All** COLOR props, `backgroundColor` included and always here. If it passes 8 props, nest sub-groups per feature (Renkler › Sepet Çekmecesi) |
+
+- **İçerik vs Metinler:** İçerik is the storefront *message* the merchant authors — headings, body copy, campaign text. Metinler are the *labels of UI controls and states* — buttons, field labels, placeholders, empty / loading / error / success messages, tab and accordion titles, aria labels. When props form a feature group, the feature group wins over both.
+- **Existing group ids are never renamed.** An `appearance` group keeps its id and gets the label "Renkler". Order is fixed with `config move-prop-group`, never by editing config.
+
+**Labels (`displayName`):** Turkish and in the merchant's words. Inside a group, drop the group's prefix: in "Sepet Çekmecesi" the prop is "Başlık", not "Sepet Çekmecesi Başlığı". URL, SVG, ID, Min / Maks and brand names stay as they are. Common patterns:
+
+| English | Türkçe |
+|---|---|
+| … Label / … Text / … Title | … Etiketi / … Metni / … Başlığı (alone: Başlık) |
+| … Button Text | … Butonu Metni |
+| … Placeholder | … Alanı Metni |
+| … Template | … Şablonu |
+| Show … / Enable … | … Göster / … Aktif (bare noun: "Marka Göster", not "Markayı Göster") |
+| Empty State | Boş Durum |
+
+**Descriptions:** write one only in these four cases; any other existing description is cleared, not translated. Keep it to one sentence of about 80 characters.
+1. **Template token:** say what it's replaced with — `"{date} tahmini teslim tarihiyle değiştirilir."`
+2. **Data binding:** say which data it drives — `"Beden rehberi içeriğini sağlayan ürün özelliği."`
+3. **Format / size:** `"Önerilen oran 4:5 (ör. 790x988px)."`. Format info goes here, never into the label.
+4. **Non-obvious behavior** (verified in source): `"Boş bırakılırsa logo metni gösterilir."`
+
+Everything else is self-explanatory and gets no description. Groups get none unless their name can't explain their scope.
 
 > **(MCP)** Group mechanics + CLI: `get_framework_guide("prop-groups")`.
 
 ### 6.4 The LINK pattern
 
-The `LINK` prop type produces an `IkasNavigationLink | null` (field list via `get_type_definition("IkasNavigationLink")`). Theme code respects `openInNewTab` and adds `rel="noopener noreferrer"` automatically when true. For navigation menus that need a flat or nested list, use `LIST_OF_LINK`. LINK `defaultValue`s are typed objects, not `{href, label}` literals — get the accepted shape from `get_prop_types()` before writing shippable defaults (§1).
+Theme code honors the link's new-tab flag and adds `rel="noopener noreferrer"` whenever it opens a new tab. For navigation menus that need a flat or nested list, use `LIST_OF_LINK`. A LINK's authored default differs from its runtime read shape — take the default shape from `get_prop_types()` before writing shippable defaults (§1).
 
-> **(MCP)** `get_type_definition("IkasNavigationLink")`. Prop type definitions: `get_prop_types()`.
+> **(MCP)** Runtime shape: `get_type_definition("IkasNavigationLink")`. Authored default shape: `get_prop_types()` (LINK section).
 
 ### 6.5 Custom ENUMs
 
@@ -278,16 +310,16 @@ The interaction grammar of the theme. Behavior is invariant across visual design
 
 #### Add to cart
 
-- **Single gate.** The ATC action is gated by the storefront's add-to-cart eligibility check — it already accounts for required option values, stock, and overselling. Don't hand-roll a stock-only check: a variant with overselling enabled (`sellIfOutOfStock`) stays purchasable at zero stock, and a product with unfilled required options must not submit (§7.13).
+- **Single gate.** The ATC action is gated by the storefront's add-to-cart eligibility check — it already accounts for required option values, stock, and overselling. Don't hand-roll a stock-only check: a variant with overselling enabled stays purchasable at zero stock, and a product with unfilled required options must not submit (§7.13).
 - **Optimistic.** Cart count badge increments immediately.
-- **Existing line merge.** Adding a variant already in the cart must not create a duplicate row — find the existing line and increase its quantity instead.
+- **Existing line merge.** Adding a variant already in the cart must not create a duplicate row — the storefront add already merges; don't hand-roll it.
 - **Edit mode.** When the PDP is opened from a cart line's "edit" affordance (edit-line query param), the ATC CTA becomes an "Update this line" action instead of adding a new line — with its own TEXT prop pair for the label.
-- **Quantity limits.** When the product declares per-sales-channel min/max quantities, the stepper clamps to them and the initial quantity starts at the minimum. Limit violations render merchant-editable copy, not a silently unresponsive stepper.
+- **Quantity limits.** When the product declares per-sales-channel min/max quantities, the stepper clamps to them and the initial quantity starts at the minimum — on the PDP **and** on cart-line steppers, where the storefront does no client-side clamping. Limit violations render merchant-editable copy, not a silently unresponsive stepper.
 - **Feedback choice (design-dependent).** Pick one and apply consistently: (a) auto-open Cart Drawer if the design ships one and the user isn't on the Cart page, (b) success toast, (c) inline confirmation on the ATC button.
-- **Pending state.** ATC button reads `form.isSubmitting`-style state and renders `submittingButtonText`. Drawer / list rows reflecting the same line render `is-pending`.
-- **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Surface the specific `validationError` (e.g. `INSUFFICIENT_STOCK`, `INVALID_PRODUCT_OPTION_VALUES`) as user-facing copy — read the current value set from `get_function_doc("addItemToCart")`; the two examples here are not exhaustive.
+- **Pending state.** While in flight, the ATC button renders `submittingButtonText` and ignores repeat clicks. Drawer / list rows reflecting the same line render `is-pending`.
+- **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Map each failure reason to user-facing copy — reasons arrive on more than one channel (validation error vs API error code), so read both.
 
-> **(MCP)** Result shape: `addItemToCart` returns `IkasCartOperationResult { success, validationError }` — the type is not in the type index, so read the shape from `get_function_doc("addItemToCart")` (not `get_type_definition`). Eligibility gate: `get_function_doc("isAddToCartEnabled")`. Line merge: `findExistingCartItem` / `changeItemQuantity`. Edit mode + quantity clamp reference implementation: `get_section_template("add-to-cart")`. Channel limit shape: `get_type_definition("IkasProductSalesChannel")`. Loading-flag pattern: `get_framework_guide("async-data-patterns")` §2.
+> **(MCP)** Result shape, failure channels, cart-line limits: `get_function_doc("addItemToCart")` + `get_framework_guide("cart-patterns")` (the result type is not in the type index). Eligibility gate: `get_function_doc("isAddToCartEnabled")`. Edit mode + quantity clamp: `get_section_template("add-to-cart")`. Loading flag: `get_framework_guide("async-data-patterns")` §2.
 
 #### Add to cart from product cards (PLP, sliders, favorites, search)
 
@@ -301,10 +333,11 @@ A card's ATC affordance follows this ladder — first matching rule wins:
 #### Update quantity, remove
 
 - Optimistic — the mutation functions mutate the model in place; the observer re-renders automatically.
-- `changeItemQuantity(item, quantity)` and `removeItem(item)` **also return `Promise<IkasCartOperationResult>`** — check `success` to drive rollback + the error toast. `quantity = 0` removes the line.
+- The row mutations report success or failure — use that outcome to drive rollback + the error toast.
 - Pending state on the affected row; rollback + error toast on failure.
+- Campaign-created lines (gift / "buy X get Y") are read-only: badge them and hide their stepper and remove control.
 
-> **(MCP)** In-place mutation semantics: `get_framework_guide("common-pitfalls")` #3 — most storefront mutations return `void`, but the cart row mutations above are result-returning exceptions. Functions: `get_function_doc("changeItemQuantity")`, `get_function_doc("removeItem")`, full inventory `list_functions("Cart")` / `list_functions("OrderLineItem")`.
+> **(MCP)** `get_function_doc("changeItemQuantity")`, `get_function_doc("removeItem")`; auto-created lines: `cart-patterns`. Inventory: `list_functions("Cart")` / `list_functions("OrderLineItem")`.
 
 #### Empty cart
 
@@ -349,7 +382,7 @@ dead-ends.
 - Available from the account shell at all times.
 - Redirect to `/`. Cart preserved as guest cart if storefront supports it; otherwise cleared.
 
-> **(MCP)** Form mechanics + submit lifecycle (`submit*Form` returns `boolean`, sets `form.isSuccess` / `isFailure` / `responseMessage`): `get_framework_guide("form-handling")`. Functions: `list_functions("Authentication")`, `list_functions("Login")`, `list_functions("Registration")`, `list_functions("ForgotPassword")`, `list_functions("RecoverPassword")`.
+> **(MCP)** Form mechanics + submit lifecycle: `get_framework_guide("form-handling")`. Social return callback: `get_function_doc("handleSocialLogin")`. Functions: `list_functions("Authentication")`, `list_functions("Login")`, `list_functions("Registration")`, `list_functions("ForgotPassword")`, `list_functions("RecoverPassword")`.
 
 ### 7.3 Variant selection (PDP)
 
@@ -358,7 +391,7 @@ dead-ends.
 - Price, SKU, stock status, ATC button state update synchronously.
 - Out-of-stock variants are visually marked but still selectable; on selection, ATC reads `outOfStockButtonText` and exposes the back-in-stock affordance per §7.11. (The design source may instead hide OOS values entirely — acceptable, as long as it can never leave the shopper on an unselectable dead combination.)
 
-> **(MCP)** `get_framework_guide("product-detail-patterns")`. Variant helpers: `get_model_guide("IkasProductVariant")`, `get_function_doc("selectVariantValue")`, `get_function_doc("getSelectedProductVariant")`. Notify-me on OOS: §7.11.
+> **(MCP)** `get_framework_guide("product-detail-patterns")`. Variant helpers: `get_model_guide("IkasProductVariant")`, `get_function_doc("selectVariantValue")` (its URL update is on by default — don't opt out), `get_function_doc("getSelectedProductVariant")`. Notify-me on OOS: §7.11.
 
 ### 7.4 Pagination & filtering (PLP)
 
@@ -368,24 +401,26 @@ dead-ends.
 - Infinite scroll is allowed but **must expose a "Load more" button as a fallback** (one click = one page, for keyboard / screen reader users).
 - Result count is always visible.
 
-> **(MCP)** `IkasProductList` helpers: `get_type_definition("IkasProductList")` + `get_framework_guide("product-list-patterns")`. Infinite-scroll primitive: `IkasThemeInfiniteScroller` via `get_framework_guide("slider-overlay-patterns")`.
+> **(MCP)** `get_model_guide("IkasProductList")` + `get_framework_guide("product-list-patterns")`. Restoring filter state from the URL: `get_function_doc("applyQueryParamForFilter")`. Infinite-scroll primitive: `IkasThemeInfiniteScroller` via `get_framework_guide("slider-overlay-patterns")`.
 
 ### 7.5 Search
 
 - Search Modal (or whatever search surface the design ships) opens via header icon.
-- Typing debounces by 200ms before firing a query. Results render as the user types; no Enter required.
+- Queries are debounced while typing. Results render as the user types; no Enter required.
 - Recent searches (if persisted) + popular queries (if the storefront provides) shown when the input is empty.
 - Enter / "See all results" navigates to the full Search Results page.
 - Empty query → recent + popular; empty results → empty surface + "Browse all" CTA.
 
+> **(MCP)** `get_function_doc("searchProductList")` — it already debounces; don't add a second one.
+
 ### 7.6 Form validation
 
-- **Don't render errors before the user attempts to submit.** The framework gates this via `form.isSubmitted` — until that flag flips, `field.hasError` won't surface meaningful errors. Once it's true, the storefront re-validates on every setter call automatically; the theme simply renders the current `field.hasError` + `field.message`.
+- **Don't render errors before the user attempts to submit.** After the first attempt the storefront re-validates on every change; the theme only renders each field's current error state.
 - **On submit failure**, move focus to the first invalid field.
 - **On submit success**, replace the form with a confirmation surface (terminal flows: contact, recover password) OR show an inline success above the cleared form (repeatable flows: address book, profile edit). Pick one per form.
 - **Required-field indicator** is a theme decision (asterisk, badge, none). Be consistent across all forms.
 
-> **(MCP)** Form model shape (`field.value` / `hasError` / `message`, `form.isSubmitting` / `isSubmitted` / `isSuccess` / `isFailure` / `responseMessage`), `init*Form` / `set*Form` / `submit*Form` lifecycle, the auto-validate-after-submit rule: `get_framework_guide("form-handling")`. Field access pattern: `get_framework_guide("common-pitfalls")` #10. Validation functions: `list_functions("Validation")`.
+> **(MCP)** Form model + lifecycle: `get_framework_guide("form-handling")`. Field access pattern: `get_framework_guide("common-pitfalls")` #10. Validation functions: `list_functions("Validation")`.
 
 ### 7.7 State anatomy
 
@@ -406,7 +441,7 @@ Loading skeletons match the loaded shape exactly — no layout shift.
 
 For every mutation (cart, favorites, address, profile):
 
-1. Render new state immediately. **Most storefront mutation functions handle step 1 for you** — they mutate the model in place; observer-driven re-renders deliver the new state without explicit setState. (Many return `void`; cart row mutations additionally return an `IkasCartOperationResult` whose `success` flag drives step 5.)
+1. Render new state immediately. **Most storefront mutation functions handle step 1 for you** — they mutate the model in place; observer-driven re-renders deliver the new state without explicit setState. Whether a mutation reports an outcome for step 5 varies per function — check its `get_function_doc`.
 2. Apply `is-pending` class to the affected UI (row, button, card) for visual feedback during the async window.
 3. Dispatch the mutation. For ATC and similar await-able mutations, use the `try/finally` loading-flag pattern.
 4. On success: remove `is-pending`. Optional toast.
@@ -414,7 +449,7 @@ For every mutation (cart, favorites, address, profile):
 
 Track in-flight mutations by stable id (line item id, product id) so parallel mutations don't collide.
 
-> **(MCP)** In-place mutation semantics (don't capture return values from `selectVariantValue`, `initLoginForm`, `clearFilter`, etc.): `get_framework_guide("common-pitfalls")` #3. Loading-flag pattern with `try/finally`: `get_framework_guide("async-data-patterns")` §2. Store reactivity: `get_framework_guide("async-data-patterns")` §5.
+> **(MCP)** In-place mutation semantics: `get_framework_guide("common-pitfalls")` #3. Loading-flag pattern with `try/finally`: `get_framework_guide("async-data-patterns")` §2. Store reactivity: `get_framework_guide("async-data-patterns")` §5.
 
 ### 7.9 Toast / feedback queue
 
@@ -448,7 +483,7 @@ Out of stock is a recovery surface (§3 #7), never a dead end. When the storefro
 - **Cards may delegate.** A product card facing an OOS product may route to the PDP instead of hosting the form inline (§7.1 card ladder).
 - All copy (notify CTA, form labels, success state) = TEXT props (§5.4).
 
-> **(MCP)** Two function families exist — a form-based flow and a direct-save flow: `list_functions("BackInStock")` + `list_functions("Stock")`. Pick one, don't mix. The enabled / login-required / saved-reminder flags live on the variant: `get_model_guide("IkasProductVariant")`.
+> **(MCP)** `get_framework_guide("back-in-stock-patterns")` — the branches use both function families together (`list_functions("BackInStock")` + `list_functions("Stock")`). Reference: `get_section_child("product-detail-section", "ProductDetailBackInStock")`.
 
 ### 7.12 Bundle products
 
@@ -471,7 +506,7 @@ When a product carries an option set (engraving text, uploaded artwork, date sel
 - **Priced options** show their price on the label, and totals reflect them via storefront price helpers — no hand math (§11.1).
 - **After a successful ATC, option values reset** to their initial state.
 
-> **(MCP)** Function families: `list_functions("Customization")`, `list_functions("ProductOption")`, `list_functions("ProductOptionSet")`. Fetch/attach: `get_function_doc("getProductOptionSet")`. Reference validation flow: `get_section_template("add-to-cart")` (its option-set util).
+> **(MCP)** `get_framework_guide("product-options")`. Functions: `list_functions("Customization")`, `list_functions("ProductOption")`, `list_functions("ProductOptionSet")`. Reference: `get_section_child("product-detail-section", "ProductDetailOptionSet")`.
 
 ---
 
@@ -509,11 +544,11 @@ These live outside the page flow. Visual styling comes from the design source; *
 
 If the design source ships a chrome surface differently (e.g. a full-page Search instead of a modal, no Cart Drawer), build what the design ships — the **function** must exist somewhere, not this specific form.
 
-**The framework already provides plumbing for most chrome surfaces** — reuse before building (§14 #20). Don't memorize the inventory; read it fresh:
+**Plumbing for most chrome surfaces already exists** — reuse before building (§14 #20). Read the inventory fresh:
 
-- `get_framework_guide("sub-component-catalog")` — modal shells (`Modal`, `ConfirmModal`), notifications (`Toast` + `useToast`), `ImagePreviewModal`, `PageLoader`, plus the form/UI building blocks and icons every chrome surface composes from.
-- `get_framework_guide("slider-overlay-patterns")` — the runtime APIs from `@ikas/bp-storefront`: `IkasThemeSlider` (carousels), `IkasThemeOverlay` (an overlay *state type*, not a JSX component — build the surface UI yourself), `IkasThemeInfiniteScroller`.
-- `get_framework_guide("header-footer-patterns")` — the Header-mounted `ToastContainer` convention and the mega-menu MenuItem pattern.
+- `get_framework_guide("sub-component-catalog")` — reusable modal, toast, loader, form and icon building blocks.
+- `get_framework_guide("slider-overlay-patterns")` — slider / overlay / infinite-scroll runtime APIs (some are state types, not JSX).
+- `get_framework_guide("header-footer-patterns")` — the Header-mounted toast host and the mega-menu pattern.
 
 ### 9.1 Cart Drawer (when the design ships one)
 
@@ -567,17 +602,17 @@ If the design source ships a chrome surface differently (e.g. a full-page Search
 
 **Mount:** From Account Dashboard. **Trigger:** "Edit profile" CTA.
 
-**Feature surface:** Form limited to the fields `getAccountInfoForm` exposes — first/last name, phone, marketing consent. Email is read-only display, not an editable field. **No password-change field:** the storefront account-info form has none; password changes go through Forgot / Recover Password (§7.2). Field-level validation per §7.6. Success: modal closes, dashboard re-renders, toast.
+**Feature surface:** Only the fields the storefront account-info form exposes. Email is read-only display, not an editable field. **No password-change field:** the storefront has no change-password API; password changes go through Forgot / Recover Password (§7.2). Field-level validation per §7.6. Success: modal closes, dashboard re-renders, toast.
 
-> **(MCP)** Form lifecycle + functions (`getAccountInfoForm`, `initAccountInfoForm`, `setAccountInfoForm*`, `submitAccountInfoForm`): `get_framework_guide("account-patterns")`.
+> **(MCP)** `get_framework_guide("account-patterns")` (Account Info Form); fields: `list_functions("AccountInfo")`.
 
 ### 9.5 Address Form Modal / Drawer
 
 **Mount:** From Account Addresses. **Trigger:** "Add address" CTA or "Edit" on a card.
 
-**Feature surface:** Form with country, name, line 1, line 2, city, state/region, postal code, phone, "Set as default" toggle. Country selector drives state/region visibility. Postal code validation respects country format where the storefront provides hints.
+**Feature surface:** An address nickname plus the fields the **selected country's address format** defines — field set, order, required-ness and select-vs-text come from the storefront at runtime, and switching country re-lays-out the form. Never hardcode a field list. Skeleton until the form initializes. "Set as default" is not an address-form field (§13.C).
 
-> **(MCP)** `getIkasCustomerAddressForm`, `getEmptyAddressForm` (new address), `initAddressForm`, `submitAddressForm`, `deleteCustomerAddress`. `list_functions("Address")`.
+> **(MCP)** `get_framework_guide("address-form-patterns")` — read before building. Functions: `list_functions("Address")`.
 
 ### 9.6 Quick View Modal (optional)
 
@@ -633,12 +668,12 @@ When in doubt about whether to expose a setting, set a sensible default and **do
 
 ### 11.1 Currency
 
-- Use the storefront's pre-formatted price strings (`formattedPrice`, `formattedFinalPrice`, `formattedSellPrice`).
-- Never construct currency manually.
+- Render every price through the storefront's formatted-price helpers — price models carry raw numbers.
+- Never construct currency manually (no `Intl.NumberFormat`); free-standing amounts ("X left for free shipping") use the storefront's currency formatter too.
 - Compare-at and discounted prices: render storefront-formatted values for each — no math in the theme.
-- Cart totals: use the order model's formatted fields.
+- Cart and order totals: use the order-level formatted helpers.
 
-> **(MCP)** Pricing helpers: `list_functions("Pricing")` + `list_functions("VariantPrice")`. `getProductVariantFormattedFinalPrice`, `getProductVariantFormattedSellPrice`, `hasProductVariantDiscount`, etc.
+> **(MCP)** `list_functions("Pricing")`, `list_functions("Order")` (e.g. `getProductVariantFormattedFinalPrice`, `getProductVariantFormattedSellPrice`, `hasProductVariantDiscount`, `formatCurrency`). Money pitfalls: `get_framework_guide("common-pitfalls")` #7, #18, #20.
 
 ### 11.2 Language and currency switchers
 
@@ -651,11 +686,11 @@ When the storefront supports multiple locales / currencies, expose switchers whe
 ### 12.1 Image performance
 
 - Hero / first viewport image: `fetchpriority="high"`, no `loading="lazy"`.
-- Use storefront image helpers — `getDefaultSrc` (1080), `getThumbnailSrc` (180), `getSrc(image, size)`, `createMediaSrcset`. Never serve the original.
+- Use the storefront image helpers at a size that fits the slot. Never serve the original.
 - For images >400px wide on desktop, render with `srcset` via `createMediaSrcset`.
-- Product media items can be videos — **always branch on `item.isVideo`** before rendering. For videos the `size` argument is ignored (`getSrc(item, 240)` is misleading); use `getDefaultSrc` for the video src, and apply `createMediaSrcset` only to `<img>` elements.
+- Product media items can be videos — **always branch on `item.isVideo`** before rendering. Size-based helpers return the full video for video items, so a video in a thumbnail slot (swatch, cart line) silently downloads the whole file; srcset applies to `<img>` only.
 
-> **(MCP)** Full helper docs: `get_functions_for_type("IkasImage")`.
+> **(MCP)** `get_functions_for_type("IkasImage")` + `get_framework_guide("image-handling")`.
 
 ### 12.2 Heading hierarchy
 
@@ -686,7 +721,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 
 > **No prop names are listed in this catalogue.** The actual prop list comes from `get_section_template("<sectionType>")` and is auto-generated by the CLI. This doc owns the **intent layer**; the framework owns the **shape layer**.
 >
-> **Template coverage moves faster than this catalogue.** `list_section_types()` also ships sections not catalogued here (currently `features-section`, `category-images-section`, `email-verification-section`) plus non-section *Pattern* templates — API reference implementations, not placeable sections (`add-to-cart`, `bundle-products`, `component-renderer`, `image-handling`, `navigation`, `product-pricing`, `variant-selection`, `favorites`). When a surface isn't catalogued below, check `list_section_types()` first, then derive its contract from §3 + §5.
+> **Template coverage moves faster than this catalogue.** `list_section_types()` also ships sections not catalogued here, plus *Pattern* templates — API reference implementations, not placeable sections. When a surface isn't catalogued below, check `list_section_types()` first, then derive its contract from §3 + §5.
 
 ---
 
@@ -789,13 +824,13 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Role:** Social proof + customer voice on the product page.
 - **Page surface:** PDP, as a separate section below Product Detail.
 - **Mandatory features:** Section title; review summary (average star rating + total review count + per-star distribution) when reviews exist; review cards (rating + title + comment + author + formatted date); pagination; "Write a review" CTA → review form (typically a modal); empty state when no reviews yet; merchant reply display when present.
-- **Optional features:** Image attachments in reviews (with preview modal); login gate when `isCustomerReviewLoginRequired(product)` returns true.
+- **Optional features:** Image attachments in reviews (with preview modal).
 - **Interactions:**
-  - "Write a review" → if `isCustomerReviewLoginRequired(product)` is true and `hasCustomer(customerStore)` is false → `Router.navigateToPage("LOGIN")`. Otherwise open the review form surface.
+  - "Write a review" → if the store requires login for reviews and the shopper is a guest → route to Login with a return path (§7.2). Otherwise open the review form surface. No write CTA when reviews are disabled.
   - Submit review → on success, re-fetch reviews + close form + show empty/loaded state per §7.7.
   - Pagination → smooth-scroll the list back to the top after page change.
 - **A11y:** Star-rating input keyboard accessible (radio-group semantics); review images focusable + Enter opens the preview modal; modal traps focus until close.
-- **MCP starter:** `get_section_template("product-reviews-section")`. Full pattern: `get_framework_guide("review-patterns")`. Form lifecycle: `getIkasProductCustomerReviewForm`, `setCustomerReviewForm*`, `submitCustomerReviewForm`.
+- **MCP starter:** `get_section_template("product-reviews-section")`. Full pattern (enabled / login-required checks, form lifecycle): `get_framework_guide("review-patterns")`, `list_functions("CustomerReview")`.
 
 #### Product List (PLP)
 
@@ -849,7 +884,7 @@ Per-section ecommerce contract — **functional features only.** Visual structur
 - **Role:** Full-page search beyond the modal.
 - **Mandatory features:** Query echo ("Results for 'foo'"); result count; filter chips; product grid; empty state.
 - **Optional features:** Sort; blog post results inline (when storefront supports cross-content search).
-- **MCP starter:** Reuse PLP starter (`category-list-section`); detect search mode via the `isProductListSearch(list)` helper (don't compare `list.type` by hand — the enum isn't in the type index); echo `list.searchKeyword` in the heading.
+- **MCP starter:** Reuse PLP starter (`category-list-section`); detect search mode and read the keyword through the list helpers (`isProductListSearch`), not by comparing list types by hand — `get_model_guide("IkasProductList")`.
 
 ---
 
@@ -861,11 +896,13 @@ All inherit:
   hydration before deciding** — checking the customer before the store initializes bounces
   logged-in users to Login. The inverse gate holds on auth pages: an already-logged-in user
   landing on Login / Register / Forgot is redirected to the account surface.
+  Hydration wait: `get_function_doc("waitForCustomerStoreInit")`.
 - Sign-out reachable from every account surface.
-- See `get_framework_guide("account-patterns")`. ⚠️ Known-stale spots in that guide (tracked
-  in ikas-editor-monorepo#740): it shows public `customerStore.orders` / `customerStore.favoriteProducts`
-  store fields and a `deleteAddress(customerStore, addressId)` signature that don't exist —
-  trust `get_function_doc(...)` signatures over the guide's snippets.
+- See `get_framework_guide("account-patterns")` — order and favorite lists are fetched
+  snapshots, not reactive store fields, so the UI updates them locally after a mutation. As
+  everywhere, `get_function_doc(...)` signatures win over guide snippets.
+- If the surface is served by a ready-made page (§4.4), these contracts are platform-owned —
+  the theme's job is the entry points into it.
 
 #### Account Dashboard
 
@@ -885,19 +922,19 @@ All inherit:
 
 - **Mandatory features:** Order number + date + status banner; itemized lines (image, name, variant, qty, line total); **multi-package rendering** — when the order ships in more than one package, lines group per package with a per-package status pill and per-package tracking info (single-package orders show tracking in the delivery block); shipping + billing address blocks; totals breakdown (subtotal → discount/campaign adjustment rows → shipping → total, via the order's formatted helpers); tracking link (when shipped+); reorder CTA (optional).
 - **Optional features:** **Refund request flow** (when the storefront allows it) — offer it only when the order has refundable items; the shopper picks per-line refund quantities, submits, and on success the order re-fetches and the panel closes; items already in a refund state leave the main list and render in their own section with per-item status badges. Cancel order CTA (when status allows); download invoice.
-- **Status semantics:** derive "active / delivered / returned / cancelled" groupings and any progress indicator from the real order status enum — do not carry over v1 status names. The enum values aren't in the MCP type index yet (read them from the package's `.d.ts`; tracked in ikas-editor-monorepo#740); statuses outside the progress mapping hide the progress indicator instead of guessing a step.
-- **MCP:** order resolution from the URL: `get_function_doc("getOrderDetailsOfPage")`. Refund family: `search_docs("refund")` (`isIkasOrderRefundable`, refundable/refunded item getters, per-line quantity setter, `refundOrder`) — note the per-line quantity write may not trigger a re-render on its own, and a successful refund requires re-fetching the order. Packages: `get_function_doc("getIkasOrderDisplayedPackages")`. Tracking data via `list_functions("OrderTracking")`; detail/totals via `list_functions("OrderDetail")`.
+- **Status semantics:** derive "active / delivered / returned / cancelled" groupings and any progress indicator from the real status unions — do not carry over v1 status names. Read them fresh: `get_type_definition("IkasOrderStatus")`, `"IkasOrderPackageStatus"`, `"IkasOrderLineItemStatus"`. Statuses outside the progress mapping hide the progress indicator instead of guessing a step.
+- **MCP:** order resolution from the URL: `get_function_doc("getOrderDetailsOfPage")`. Refund family: `search_docs("refund")` (`isIkasOrderRefundable`, refundable/refunded item getters, per-line quantity setter, `refundOrder`) — note the per-line quantity write may not trigger a re-render on its own, and a successful refund requires re-fetching the order. Packages + per-package tracking: `get_function_doc("getIkasOrderDisplayedPackages")`, `get_type_definition("IkasTrackingInfo")`. Detail/totals: `list_functions("OrderDetail")`, `list_functions("Order")`.
 
 #### Account Addresses
 
 - **Mandatory features:** Card list of saved addresses; default indicator; "Add address" → modal (§9.5); Edit / Delete per card; empty state.
-- **Optional features:** "Make default" action per card. There is no dedicated storefront API for it — the pattern is saving the customer with the address list re-mapped so only the target has `isDefault` (tracked for documentation in ikas-editor-monorepo#740).
+- **Optional features:** "Make default" action per card. There is no dedicated storefront API for it — the pattern is saving the customer with the address list re-mapped so only the target is the default (`get_function_doc("saveCustomer")`).
 - **Interactions:** Add / Edit → modal; Delete → confirm step (inline confirm or `ConfirmModal`) → optimistic remove.
 
 #### Favorite Products
 
 - **Role:** Saved products.
-- **Mandatory features:** Grid of favorited cards; empty state with browse CTA; remove from favorites action on each card.
+- **Mandatory features:** Grid of favorited cards; empty state with browse CTA; remove from favorites action on each card (the card leaves the grid immediately).
 - **Optional features:** Sort by date added / name / price.
 - **MCP starter:** `get_section_template("favorites")` + `list_functions("Customer")` for favorite helpers.
 
@@ -908,14 +945,14 @@ All inherit:
 #### Blog List
 
 - **Role:** Listing of editorial posts.
-- **Mandatory features:** Card grid (cover image via `blog.image`, title, summary/excerpt, formatted date via `getIkasBlogFormattedDate`, link via `getIkasBlogHref`); pagination via `hasBlogListNextPage` / `getBlogListNextPage`; empty state.
+- **Mandatory features:** Card grid (cover image, title, summary/excerpt, storefront-formatted date, link via the storefront href helper); pagination per §7.4; empty state.
 - **Optional features (when the design ships them):** Blog hero above the grid; category filter chips; reading-time estimate; per-card category label.
-- **MCP starter:** `get_section_template("blog-home-section")` + `get_framework_guide("blog-patterns")`. Full function list: `list_functions("BlogList")`.
+- **MCP starter:** `get_section_template("blog-home-section")` + `get_framework_guide("blog-patterns")`. Functions: `list_functions("Blog")`, `list_functions("BlogList")`.
 
 #### Blog Detail
 
 - **Role:** Single editorial post.
-- **Mandatory features:** Cover image (via `blogPost.image` + `getDefaultSrc`); title (`<h1>` via `blogPost.title`); publish date (via `getIkasBlogFormattedDate`); **article body — rendered from `blogPost.blogContent.content` via `dangerouslySetInnerHTML`, NOT from a RICH_TEXT prop** (the body lives on the BLOG model, not the section).
+- **Mandatory features:** Cover image; title (`<h1>`); storefront-formatted publish date; **article body — rendered from the BLOG model's content, NOT from a RICH_TEXT prop** (`get_model_guide("IkasBlog")`).
 - **Optional features (when the design ships them):** Reading-time estimate; author byline; tag list; "Back to all posts" link; sticky TOC for long articles; share buttons.
 - **MCP starter:** `get_section_template("blog-post-section")`.
 
@@ -963,9 +1000,9 @@ All inherit:
 
 - **Role:** Let a guest see their order without an account — a recovery path (§3 #7) for the largest post-purchase support driver ("where is my order?").
 - **Page surface:** Utility page; linked from Footer and/or order emails. No auth gate — open to guests and logged-in users alike.
-- **Mandatory features:** Email + order number form (storefront's order-tracking form lifecycle, validation per §7.6); on success, a **read-only** order view reusing the Account Order Detail anatomy (status, progress, line items with multi-package grouping, totals, delivery + payment blocks); not-found and generic-error states with merchant-editable copy; a "search another order" action that resets to the form.
-- **Excluded:** the refund flow — guests don't refund from this surface.
-- **MCP:** `list_functions("OrderTracking")` — note the submit returns the found order (or null), not a boolean like other form submits. No section template exists yet (ikas-editor-monorepo#740); derive from the Account Order Detail contract.
+- **Mandatory features:** Email + order number form (storefront's order-tracking form lifecycle, validation per §7.6); on success, an order view reusing the Account Order Detail anatomy (status, progress, line items with multi-package grouping, totals, delivery + payment blocks); not-found and generic-error states with merchant-editable copy; a "search another order" action that resets to the form.
+- **Refund flow:** optional (the refund API accepts a guest email); if offered, it follows the Account Order Detail refund rules.
+- **MCP:** `list_functions("OrderTracking")` — `get_function_doc("submitOrderTrackingForm")` returns differently from other submits. Guest refund: `get_function_doc("refundOrder")`. No template yet; derive from Account Order Detail.
 
 ---
 
@@ -974,7 +1011,7 @@ All inherit:
 These are violations. Theme PRs that introduce them should be rejected.
 
 1. Hardcoded user-visible text in JSX.
-2. DIY price formatting (building currency strings by hand instead of using storefront `formattedPrice`).
+2. DIY price formatting (building currency strings by hand instead of using the storefront's formatted-price helpers, §11.1).
 3. Blocking modals on page load.
 4. Auto-opening modals/drawers (Cart Drawer after ATC is the only allowed exception).
 5. Forced sign-up walls in front of browse / search / PDP.
@@ -985,7 +1022,7 @@ These are violations. Theme PRs that introduce them should be rejected.
 10. Animations without `prefers-reduced-motion` fallback.
 11. Multiple `<h1>` elements per page.
 12. Color as the only signal for status (out-of-stock, error, success).
-13. Removing Header or Footer from any page (including 404 and auth pages).
+13. Removing Header or Footer from any theme page built from sections (including 404 and auth pages). Ready-made pages are exempt (§4.4).
 14. Sections mutating global state on mount.
 15. Optimistic UI without rollback handling.
 16. Re-fetching the whole cart on a single-row mutation.
@@ -1010,7 +1047,7 @@ Before merging a section:
 4. **Section feature surface** (§13) complete — all Mandatory features present.
 5. **Behavior contracts** (§7) implemented for every interaction the section triggers.
 6. **State anatomy** (§7.7) — loading, empty, error, loaded all render.
-7. **Defaults are shippable.** A merchant could install with zero edits and see the design source.
+7. **Defaults are shippable** (§1). Copy and links match the design source; unfilled image / entity props render a deliberate state.
 8. **Optimistic mutations** (where applicable) handle success AND failure rollback.
 9. **Chrome triggers** wired per §9.
 10. **No prop bloat** — no merchant controls for design-decided dimensions (color, alignment, layout, aspect ratio).
@@ -1020,4 +1057,4 @@ Before merging a section:
 
 ---
 
-*Last updated: 2026-07-22 — verified against the live ikas-code-components MCP server and a production ikas theme's purchase-flow inventory.*
+*Last updated: 2026-09-25 — verified against `@ikas/code-components-mcp` 2.9.2.*

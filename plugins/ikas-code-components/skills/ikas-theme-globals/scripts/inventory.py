@@ -5,7 +5,11 @@ Kullanım: python3 inventory.py <proje-kökü>
 
 src/ altındaki .css ve .tsx dosyalarını tarar; hex/rgb/hsl renkleri ve
 font-family / font-size / font-weight değerlerini frekans sıralı döker.
-var(--...) üzerinden gelen (zaten token'lanmış) kullanımlar sayılmaz.
+var(--...) üzerinden gelen (zaten token'lanmış) kullanımlar sayılmaz; var(--x, #hex)
+fallback'lerindeki renkler hardcoded sayılmaz, ayrı "FALLBACK" listesinde gösterilir
+(token'a geçişte kaldırılabilirler ama sessiz kırılma riski taşımazlar).
+Not: TSX'te fonksiyon argümanı olarak verilen fallback'ler (getX("..", "#hex")) ayırt
+edilemez — listeyi yorumlayarak oku.
 """
 import os
 import re
@@ -18,6 +22,14 @@ FONT_FAMILY = re.compile(r"font-family\s*:\s*([^;}\n]+)")
 FONT_SIZE = re.compile(r"font-size\s*:\s*([^;}\n]+)")
 FONT_WEIGHT = re.compile(r"font-weight\s*:\s*([^;}\n]+)")
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+# var(--x, <fallback>) — fallback bir düzey iç içe parantez içerebilir (rgba(...))
+VAR_FALLBACK = re.compile(r"var\(\s*--[\w-]+\s*,((?:[^()]|\([^()]*\))*)\)")
+
+
+def split_fallbacks(text):
+    """Fallback segmentlerini ayırır; (fallback'siz metin, fallback metinleri) döner."""
+    fallbacks = [m.group(1) for m in VAR_FALLBACK.finditer(text)]
+    return VAR_FALLBACK.sub("var()", text), fallbacks
 
 
 def norm_hex(value: str) -> str:
@@ -27,6 +39,9 @@ def norm_hex(value: str) -> str:
 def scan(root: str):
     colors = Counter()
     color_files = defaultdict(set)
+    fallback = Counter()
+    fallback_files = defaultdict(set)
+    scanned = 0
     families = Counter()
     sizes = Counter()
     weights = Counter()
@@ -46,7 +61,13 @@ def scan(root: str):
                 text = open(path, encoding="utf-8").read()
             except OSError:
                 continue
-            text = BLOCK_COMMENT.sub("", text)
+            scanned += 1
+            text, fbs = split_fallbacks(BLOCK_COMMENT.sub("", text))
+            for fb in fbs:
+                for m in list(HEX.finditer(fb)) + list(COLOR_FUNC.finditer(fb)):
+                    v = re.sub(r"\s+", " ", m.group(0)).lower()
+                    fallback[v] += 1
+                    fallback_files[v].add(rel)
 
             for m in HEX.finditer(text):
                 v = norm_hex(m.group(0))
@@ -68,7 +89,7 @@ def scan(root: str):
                 for m in FONT_WEIGHT.finditer(text):
                     weights[m.group(1).strip()] += 1
 
-    return colors, color_files, families, sizes, weights
+    return scanned, colors, color_files, fallback, fallback_files, families, sizes, weights
 
 
 def dump(title: str, counter: Counter, files=None, limit_files=4):
@@ -87,12 +108,15 @@ def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     root = sys.argv[1]
-    colors, color_files, families, sizes, weights = scan(root)
+    scanned, colors, color_files, fallback, fallback_files, families, sizes, weights = scan(root)
+    print(f"Taranan dosya: {scanned} (src/ altı .css/.tsx/.ts)")
     dump("RENKLER (hardcoded)", colors, color_files)
+    dump("FALLBACK RENKLER (var(--x, …) içinde — token'lı, bilgi amaçlı)", fallback, fallback_files)
     dump("FONT-FAMILY", families)
     dump("FONT-SIZE", sizes)
     dump("FONT-WEIGHT", weights)
-    print(f"\nToplam hardcoded renk kullanımı: {sum(colors.values())}")
+    print(f"\nToplam hardcoded renk kullanımı: {sum(colors.values())} "
+          f"(+ {sum(fallback.values())} fallback, sayılmadı)")
 
 
 if __name__ == "__main__":

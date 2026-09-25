@@ -10,11 +10,14 @@ Kontroller:
 2. Kalan hardcoded renkler (allowlist düşülerek) — migration sonrası kaçak tespiti.
 3. TSX'te kullanılan _<id> tipografi class'larının katalogda var olup olmadığı
    (--tokens verilmişse).
+4. @media koşulları: koşul içinde var() (tarayıcı sessizce düşürür), bp(<id>) ile
+   referans verilen breakpoint'in katalogda olması (--tokens verilmişse) ve bp()
+   içeren calc()'ta px dışı birim (production build'de bloğun tamamı düşer).
 
 --tokens: list_theme_globals çıktısının kaydedildiği dosya (JSON/metin farketmez);
 içindeki var(--X) ve "id":"X" desenleri okunur. Renk token'larında cssVar casing'i
 id'den FARKLIDIR — eşleşme cssVar'dan çıkarılan adla, birebir casing ile yapılır.
-Çıkış kodu: dangling varsa 1, yoksa 0.
+Çıkış kodu: dangling var() veya 4. kontrolde hata varsa 1, yoksa 0.
 """
 import argparse
 import os
@@ -33,6 +36,10 @@ HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 COLOR_FUNC = re.compile(r"\b(?:rgba?|hsla?|oklch)\((?:[^()]|\([^)]*\))*\)")
 TYPO_CLASS = re.compile(r"className=\{?[\"'`]([^\"'`]*)[\"'`]")
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+VAR_FALLBACK = re.compile(r"var\(\s*--[\w-]+\s*,((?:[^()]|\([^()]*\))*)\)")
+MEDIA_COND = re.compile(r"@media\s*([^{;]+)\{")
+BP_REF = re.compile(r"\bbp\(\s*([A-Za-z0-9_-]+)\s*\)")
+NON_PX_UNIT = re.compile(r"\d(?:\.\d+)?\s*(?:rem|em|vw|vh|%)")
 
 
 def iter_source(root):
@@ -74,6 +81,8 @@ def main():
     defined, referenced = set(), defaultdict(Counter)
     hardcoded = defaultdict(Counter)
     typo_used = defaultdict(set)
+    media_errors = []            # (dosya, koşul, sorun)
+    bp_used = defaultdict(set)   # breakpoint id -> dosyalar
 
     for rel, raw in iter_source(args.root):
         text = BLOCK_COMMENT.sub("", raw)
@@ -87,14 +96,26 @@ def main():
         for m in VAR_REF.finditer(text):
             if m.group(2) == ")":  # fallback'siz kullanım — kırılma riski taşıyan bu
                 referenced[m.group(1)][rel] += 1
-        for m in HEX.finditer(text):
+        # var(--x, #hex) fallback'leri token'lıdır — hardcoded sayılmaz
+        text_nofb = VAR_FALLBACK.sub("var()", text)
+        for m in HEX.finditer(text_nofb):
             v = m.group(0).lower()
             if v not in allow:
                 hardcoded[v][rel] += 1
-        for m in COLOR_FUNC.finditer(text):
+        for m in COLOR_FUNC.finditer(text_nofb):
             v = re.sub(r"\s+", " ", m.group(0))
             if "var(" not in v and v.lower() not in allow:
                 hardcoded[v][rel] += 1
+        if rel.endswith(".css"):
+            for m in MEDIA_COND.finditer(text):
+                cond = re.sub(r"\s+", " ", m.group(1)).strip()
+                if "var(" in cond:
+                    media_errors.append((rel, cond, "@media koşulunda var() çalışmaz — bp(<id>) kullan"))
+                ids = BP_REF.findall(cond)
+                for i in ids:
+                    bp_used[i].add(rel)
+                if ids and "calc(" in cond and NON_PX_UNIT.search(cond):
+                    media_errors.append((rel, cond, "bp() içeren calc()'ta yalnız px aritmetiği — blok düşer"))
         if rel.endswith(".tsx"):
             for m in TYPO_CLASS.finditer(text):
                 for cls in m.group(1).split():
@@ -135,7 +156,18 @@ def main():
         else:
             print(f"  {len(typo_used)} class, hepsi katalogda ✓")
 
-    sys.exit(1 if dangling else 0)
+    print("\n== 4) @media / breakpoint ==")
+    if args.tokens:
+        for i, files in sorted(bp_used.items()):
+            if i not in known_ids:
+                media_errors.append((", ".join(sorted(files)), f"bp({i})", "breakpoint id katalogda YOK"))
+    if media_errors:
+        for f, cond, problem in media_errors:
+            print(f"  {f}: {cond}  → {problem}")
+    else:
+        print(f"  {sum(len(v) for v in bp_used.values())} bp() referansı, sorun yok ✓")
+
+    sys.exit(1 if dangling or media_errors else 0)
 
 
 if __name__ == "__main__":
