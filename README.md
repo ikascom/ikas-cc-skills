@@ -211,7 +211,8 @@ ve `build` temiz geçmeli.
 skills/ikas-theme-builder/
 ├── SKILL.md                    # görev iş akışları (A-G), bitiş kontrolü
 ├── scripts/lint.py             # §14 lint'i: observer, backgroundColor, catch'siz sepet
-│                               #   mutasyonu, sabit metin, reduced-motion, elle fiyat, çoklu h1
+│                               #   mutasyonu, yutulan hata, çift arama debounce'u, sabit metin,
+│                               #   reduced-motion, elle fiyat, çoklu h1, proje geneli akış kapsamı
 └── references/commerce.md      # tasarımdan bağımsız e-ticaret kural seti (~1000 satır;
                                 #   audit ve prop-normalize de bu dosyayı okur)
 ```

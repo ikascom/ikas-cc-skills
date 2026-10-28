@@ -13,6 +13,11 @@ Kurallar (her bulgu dosya:satır ve dayanak § ile basılır):
   reduced-motion   UYARI  Animasyon/transition var, prefers-reduced-motion yok (§5.7, §14 #10)
   diy-price        UYARI  Elle para biçimlendirme şüphesi (§11.1, §14 #2)
   multi-h1         UYARI  Aynı component klasöründe birden fazla <h1> (§12.2, §14 #11)
+  silent-failure   UYARI  Yalnız console.* yazan catch ya da sonucu okunmayan sepet mutasyonu (§7.7, §14 #25)
+  search-debounce  HATA   searchProductList setTimeout içinde — SDK zaten debounce ediyor (§7.5, §14 #26)
+  coverage         HATA/UYARI  Proje genelinde eksik akış: ATC var ama opsiyon seti hiç yüklenmiyor (HATA,
+                         §7.13); sipariş/sepet satırı var ama set alt ürünleri hiç okunmuyor (§7.12);
+                         favori fonksiyonu hiç yok (§13.B); editLineID okunuyor ama giriş noktası yok (§14 #28)
 
 Allowlist (--allow): satır başına "kural:dosya" ya da "kural:dosya:satır"; "//" ile başlayan
 satır yorumdur — her istisnayı gerekçelendir. Çıkış kodu: HATA varsa 1, yoksa 0.
@@ -28,12 +33,18 @@ from collections import defaultdict
 SEVERITY = {
     "observer-root": "HATA", "bg-color": "HATA", "mutation-catch": "HATA", "static-text": "HATA",
     "reduced-motion": "UYARI", "diy-price": "UYARI", "multi-h1": "UYARI",
+    "silent-failure": "UYARI", "search-debounce": "HATA", "coverage": "HATA",
 }
 BASIS = {
     "observer-root": "§14 #19", "bg-color": "§5.1", "mutation-catch": "§7.8, §14 #15",
     "static-text": "§5.4, §14 #1", "reduced-motion": "§5.7, §14 #10", "diy-price": "§11.1, §14 #2",
-    "multi-h1": "§12.2, §14 #11",
+    "multi-h1": "§12.2, §14 #11", "silent-failure": "§7.7, §7.8, §14 #25",
+    "search-debounce": "§7.5, §14 #26", "coverage": "§7.1, §7.12, §7.13, §13.B",
 }
+# coverage bulgularının bir kısmı uyarı düzeyinde; SEVERITY kural başına olduğu için ayrı tutulur
+COVERAGE_WARN = "coverage-warn"
+SEVERITY[COVERAGE_WARN] = "UYARI"
+BASIS[COVERAGE_WARN] = BASIS["coverage"]
 
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
 LINE_COMMENT = re.compile(r"(?<![:\"'])//[^\n]*")
@@ -71,16 +82,63 @@ def matching_brace(text, open_pos):
     return len(text)
 
 
-def catch_protected(text, pos):
-    """Çağrı catch'li bir try bloğunda ya da .catch( zincirinde mi?"""
+def matching_paren(text, open_pos):
+    depth = 0
+    for i in range(open_pos, len(text)):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+    return len(text)
+
+
+def in_try_with_catch(text, pos):
     for m in re.finditer(r"\btry\s*\{", text[:pos]):
         start = m.end() - 1
         end = matching_brace(text, start)
         if start < pos < end and re.match(r"\s*catch\b", text[end + 1:]):
             return True
+    return False
+
+
+def wrapper_catches(text, pos):
+    """`mutate(() => changeItemQuantity(...))` — lambda bir yardımcıya geçiyorsa ve o
+    yardımcının gövdesi try/catch içeriyorsa çağrı korumalı sayılır."""
+    m = re.search(r"(\w+)\(\s*(?:async\s*)?\(\s*\)\s*=>\s*(?:await\s+)?$", text[max(0, pos - 80):pos])
+    if not m:
+        return False
+    name = m.group(1)
+    d = re.search(rf"(?:const|let)\s+{name}\s*=|function\s+{name}\s*\(", text)
+    if not d:
+        return False
+    # parametre tipleri parantez/ok içerebilir — gövdeyi tanımdan sonraki ilk "=> {" ya da ") {" açar
+    b = re.compile(r"=>\s*\{|\)\s*(?::[^{]*)?\{").search(text, d.end())
+    if not b:
+        return False
+    start = b.end() - 1
+    body = text[start:matching_brace(text, start) + 1]
+    return re.search(r"\}\s*catch\b", body) is not None
+
+
+def catch_protected(text, pos):
+    """Çağrı catch'li bir try bloğunda, .catch( zincirinde ya da catch'li bir sarmalayıcıda mı?"""
+    if in_try_with_catch(text, pos) or wrapper_catches(text, pos):
+        return True
     stmt_end = text.find(";", pos)
     stmt = text[pos:stmt_end if stmt_end != -1 else len(text)]
     return ".catch(" in stmt
+
+
+CATCH_BLOCK = re.compile(r"\bcatch\s*(?:\([^)]*\))?\s*\{")
+CONSOLE_ONLY = re.compile(r"^\s*(?:console\.\w+\([^;]*\)\s*;?\s*)+$", re.S)
+CATCH_CHAIN = re.compile(r"\.catch\(\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>\s*\{?")
+# sonucu atılan mutasyon: ifade olarak tek başına duran await çağrısı
+UNREAD_RESULT = re.compile(
+    r"(?:^|[;{}])\s*await\s+(addItemToCart|changeItemQuantity|removeItem|saveCouponCode|removeCouponCode|removeGiftCardLine)\s*\(",
+    re.M,
+)
 
 
 def main():
@@ -107,7 +165,8 @@ def main():
     findings = []  # (kural, dosya, satır, mesaj)
 
     def add(rule, rel, line, msg):
-        if only and rule not in only:
+        key = "coverage" if rule == COVERAGE_WARN else rule
+        if only and key not in only:
             return
         if paths:
             if rel == "ikas.config.json":
@@ -115,7 +174,7 @@ def main():
                     return
             elif not any(rel == p or rel.startswith(p + os.sep) for p in paths):
                 return
-        if f"{rule}:{rel}" in allow or f"{rule}:{rel}:{line}" in allow:
+        if f"{key}:{rel}" in allow or f"{key}:{rel}:{line}" in allow:
             return
         findings.append((rule, rel, line, msg))
 
@@ -148,6 +207,7 @@ def main():
                 text = strip_comments(open(path, encoding="utf-8").read(), css=css)
                 folders[os.path.relpath(dirpath, root)].append((rel, text, "css" if css else "tsx"))
 
+    all_tsx = []
     for folder, files in folders.items():
         is_root_component = folder.startswith(os.path.join("src", "components") + os.sep)
         motion_hits, reduced, h1s = [], "prefers-reduced-motion" in global_css, []
@@ -178,6 +238,27 @@ def main():
                     continue
                 if not catch_protected(text, m.start()):
                     add("mutation-catch", rel, line_of(text, m.start()), f"{m.group(1)}() catch'siz — başarısızlıkta kullanıcı geri bildirimi yok")
+            for m in CATCH_BLOCK.finditer(text):
+                start = m.end() - 1
+                body = text[start + 1:matching_brace(text, start)]
+                if CONSOLE_ONLY.match(body):
+                    add("silent-failure", rel, line_of(text, m.start()), "catch yalnız console'a yazıyor — kullanıcı hatayı görmüyor (error state / toast)")
+            for m in CATCH_CHAIN.finditer(text):
+                arrow_end = m.end()
+                if text[arrow_end - 1] == "{":
+                    body = text[arrow_end:matching_brace(text, arrow_end - 1)]
+                else:
+                    body = text[arrow_end:matching_paren(text, m.end(0) - len(m.group(0)) + m.group(0).index("("))]
+                    body = body.rstrip(") \n")
+                if CONSOLE_ONLY.match(body) or re.fullmatch(r"\s*console\.\w+\([^;]*", body or ""):
+                    add("silent-failure", rel, line_of(text, m.start()), ".catch yalnız console'a yazıyor — veri null kalır, ekran 'yükleniyor'da asılı kalabilir")
+            for m in UNREAD_RESULT.finditer(text):
+                pos = m.start(1)
+                add("silent-failure", rel, line_of(text, pos), f"{m.group(1)}() sonucu okunmuyor — success:false sessiz kalır")
+            for m in re.finditer(r"\bsetTimeout\s*\(", text):
+                open_pos = m.end() - 1
+                if "searchProductList(" in text[open_pos:matching_paren(text, open_pos)]:
+                    add("search-debounce", rel, line_of(text, m.start()), "searchProductList setTimeout içinde — SDK kendi debounce'unu yapıyor, çift gecikme 'sonuç yok' gösterir")
             for m in JSX_TEXT.finditer(text):
                 t = " ".join(m.group(2).split())
                 add("static-text", rel, line_of(text, m.start(2)), f"sabit metin: {t[:50]!r}")
@@ -187,11 +268,27 @@ def main():
                 add("diy-price", rel, line_of(text, m.start()), f"para biçimlendirme şüphesi: {m.group(0)[:40]!r} — get*FormattedPrice helper'ları / formatCurrency (MCP common-pitfalls #20)")
             for m in re.finditer(r"<h1\b", text):
                 h1s.append((rel, line_of(text, m.start())))
+            all_tsx.append(text)
         if motion_hits and not reduced:
             rel, line = motion_hits[0]
             add("reduced-motion", rel, line, f"{len(motion_hits)} animasyon/transition, klasörde prefers-reduced-motion yok")
         if len(h1s) > 1:
             add("multi-h1", h1s[1][0], h1s[1][1], f"klasörde {len(h1s)} <h1> — sayfada tek <h1> olmalı")
+
+    # --- proje geneli kapsam: akışın hiç kodlanmadığı durumlar (dosya:satır yok)
+    if not paths:
+        corpus = "\n".join(all_tsx)
+        has_atc = re.search(r"\baddItemToCart\s*\(", corpus) is not None
+        if has_atc and "getProductOptionSet" not in corpus:
+            add("coverage", "src", 0, "addItemToCart var ama getProductOptionSet hiç çağrılmıyor — opsiyonlu ürünler PDP'de eklenemez ya da opsiyonsuz eklenir (§7.13)")
+        if "orderLineItems" in corpus and "bundleProducts" not in corpus:
+            add(COVERAGE_WARN, "src", 0, "satırlar render ediliyor ama bundleProducts hiç okunmuyor — set alt ürünleri sepet/siparişte görünmez (§7.12)")
+        if "orderLineItems" in corpus and re.search(r"\.options\b", corpus) is None and "getProductOptionSet" in corpus:
+            add(COVERAGE_WARN, "src", 0, "opsiyon seti var ama satır opsiyonları (item.options) hiç gösterilmiyor (§7.13)")
+        if has_atc and not re.search(r"\b(addIkasProductToFavorites|addProductToFavorites)\b", corpus):
+            add(COVERAGE_WARN, "src", 0, "favori ekleme fonksiyonu hiç kullanılmıyor — PDP favori toggle'ı zorunlu (§13.B)")
+        if "editLineID" in corpus and "editOrderLineItem" not in corpus:
+            add(COVERAGE_WARN, "src", 0, "editLineID okunuyor ama hiçbir satır editOrderLineItem ile düzenlemeye götürmüyor — ölü mod (§7.1, §14 #28)")
 
     # --- rapor
     errors = sum(1 for f in findings if SEVERITY[f[0]] == "HATA")
@@ -202,7 +299,8 @@ def main():
         items = by_rule.get(rule)
         if not items:
             continue
-        print(f"== {rule} [{SEVERITY[rule]}] ({BASIS[rule]}) — {len(items)}")
+        label = "coverage" if rule == COVERAGE_WARN else rule
+        print(f"== {label} [{SEVERITY[rule]}] ({BASIS[rule]}) — {len(items)}")
         for _, rel, line, msg in sorted(items, key=lambda x: (x[1], x[2])):
             loc = f"{rel}:{line}" if line else rel
             print(f"  {loc}  {msg}")

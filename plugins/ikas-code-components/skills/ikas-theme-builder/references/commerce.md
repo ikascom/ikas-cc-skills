@@ -311,24 +311,28 @@ The interaction grammar of the theme. Behavior is invariant across visual design
 #### Add to cart
 
 - **Single gate.** The ATC action is gated by the storefront's add-to-cart eligibility check — it already accounts for required option values, stock, and overselling. Don't hand-roll a stock-only check: a variant with overselling enabled stays purchasable at zero stock, and a product with unfilled required options must not submit (§7.13).
+- **Gate ≠ disabled button.** The gate decides whether the click *submits*, not whether the button is clickable. When the only blocker is unfilled options, the CTA stays enabled: the click reveals the option errors, moves focus to the first invalid field, and states the reason under the CTA. Disable the CTA only for blockers the shopper can't fix on this surface (OOS → §7.11, bundle limits → §7.12 with a stated reason). A CTA disabled because of options is a silent dead end — and it makes §7.13's "errors after the first attempt" unreachable.
 - **Optimistic.** Cart count badge increments immediately.
 - **Existing line merge.** Adding a variant already in the cart must not create a duplicate row — the storefront add already merges; don't hand-roll it.
-- **Edit mode.** When the PDP is opened from a cart line's "edit" affordance (edit-line query param), the ATC CTA becomes an "Update this line" action instead of adding a new line — with its own TEXT prop pair for the label.
-- **Quantity limits.** When the product declares per-sales-channel min/max quantities, the stepper clamps to them and the initial quantity starts at the minimum — on the PDP **and** on cart-line steppers, where the storefront does no client-side clamping. Limit violations render merchant-editable copy, not a silently unresponsive stepper.
+- **Edit mode (only with an entry point).** Ship it only if the cart line ships an "edit" affordance (the storefront's edit-line navigation, `editOrderLineItem`). Then the PDP's ATC becomes "Update this line" with its own TEXT prop pair. **Add the new line first and remove the old one only after the add succeeds** — remove-then-add loses the shopper's item when the add fails. No entry point → no edit mode in the code: a dormant branch is untested risk.
+- **Quantity limits.** The stepper's ceiling is the smaller of the variant's stock (when overselling is off) and the sales channel's per-cart max, **minus the quantity of that variant already in the cart** — the add merges into the existing line, so the API judges the merged total. The initial quantity starts at the channel's minimum. Clamp on the PDP **and** on cart-line steppers, where the storefront does no client-side clamping. At the ceiling, `+` disables and a merchant-editable note (`{count}` template) says why — never a silently unresponsive stepper.
 - **Feedback choice (design-dependent).** Pick one and apply consistently: (a) auto-open Cart Drawer if the design ships one and the user isn't on the Cart page, (b) success toast, (c) inline confirmation on the ATC button.
 - **Pending state.** While in flight, the ATC button renders `submittingButtonText` and ignores repeat clicks. Drawer / list rows reflecting the same line render `is-pending`.
-- **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Map each failure reason to user-facing copy — reasons arrive on more than one channel (validation error vs API error code), so read both.
+- **Failure.** Optimistic state rolls back; cart count decrements; error toast with Retry; CTA returns to idle. Map each failure reason to user-facing copy — reasons arrive on more than one channel (validation error vs API error code), so read both. At minimum: per-cart limit reached, insufficient stock, invalid option values, plus a generic fallback — each a TEXT prop. A thrown exception takes the same path as a failed result (`catch` → toast), never only `console.error`.
 
 > **(MCP)** Result shape, failure channels, cart-line limits: `get_function_doc("addItemToCart")` + `get_framework_guide("cart-patterns")` (the result type is not in the type index). Eligibility gate: `get_function_doc("isAddToCartEnabled")`. Edit mode + quantity clamp: `get_section_template("add-to-cart")`. Loading flag: `get_framework_guide("async-data-patterns")` §2.
 
-#### Add to cart from product cards (PLP, sliders, favorites, search)
+#### Add to cart from product cards (PLP, sliders, favorites, search, cart-drawer recommendations)
 
-A card's ATC affordance follows this ladder — first matching rule wins:
+Every surface that can add a product without the PDP — full cards, compact quick-add buttons, cart-drawer upsell/recommendation tiles — follows this ladder, first matching rule wins. Implement it **once** as a shared helper and call it from each surface; per-surface copies drift (a compact upsell tile that skips the OOS or bundle rung is the typical miss).
 
 1. **Out of stock** → the card shows its OOS state and offers a recovery affordance: notify-me per §7.11, or navigation to the PDP. Never a silently dead button.
 2. **Bundle product** → navigate to the PDP; cards never quick-add bundles (§7.12).
-3. **Single variant, no option set** → direct ATC per the contract above.
-4. **Multiple variants or an option set** → open the Quick View surface (§9.6) or navigate to the PDP (design decision). Never silently add a default variant the shopper didn't choose.
+3. **Option set** (the product references one — no need to load it) → Quick View or PDP; a quick add would submit without the personalization (§7.13).
+4. **Multiple variants** → open the Quick View surface (§9.6) or navigate to the PDP (design decision). Never silently add a default variant the shopper didn't choose.
+5. **Single variant** → direct ATC per the contract above.
+
+Cards also carry the **favorite toggle** (§7.8 optimistic; guest → Login with a return path, §7.2) with add/remove `aria-label`s as TEXT props.
 
 #### Update quantity, remove
 
@@ -411,7 +415,9 @@ dead-ends.
 - Enter / "See all results" navigates to the full Search Results page.
 - Empty query → recent + popular; empty results → empty surface + "Browse all" CTA.
 
-> **(MCP)** `get_function_doc("searchProductList")` — it already debounces; don't add a second one.
+- **"No results" only after the results settled.** The storefront search returns nothing to await, debounces internally, and its loading flag flips only when the request actually starts — between typing and that moment the list still holds the previous query's results (or none). Treat the results as belonging to the current query only once a request issued for that query has finished; until then render the searching state, not the empty state. Same rule on the Search Results page.
+
+> **(MCP)** `get_function_doc("searchProductList")` — it already debounces; don't add a second one (no `setTimeout` around it).
 
 ### 7.6 Form validation
 
@@ -434,6 +440,8 @@ Every section that fetches data implements four states with the same shape:
 | Loaded | Real content. |
 
 Loading skeletons match the loaded shape exactly — no layout shift.
+
+A failed fetch must land in the Error state. The common bug: the fetch rejects (or resolves empty), the data stays `null`, and `null` is read as "loading" forever. Keep the error as its own state, and make Retry re-run the fetch.
 
 > **(MCP)** Async loading patterns: `get_framework_guide("async-data-patterns")`.
 
@@ -491,7 +499,7 @@ A variant can carry bundle settings (a composed set of sub-products sold as one 
 
 - **PDP renders the bundle's sub-products** — selection and per-item quantity editing per what the bundle settings allow.
 - **ATC eligibility widens:** it includes every sub-product's stock (respecting each one's own overselling flag) and the bundle's min/max quantity constraints. A violation blocks ATC **with a stated reason** (which sub-product, which limit) — not a silently disabled button.
-- **Cart lines for bundles render their sub-products**; editing a bundle line routes back to the PDP rather than editing inline.
+- **Lines for bundles render their sub-products** (quantity × name · variant) — in the cart page, the cart drawer **and** every order view (account order detail, guest order tracking). Editing a bundle line routes back to the PDP rather than editing inline.
 - **Cards never quick-add bundles** — navigate to the PDP (§7.1 card ladder).
 
 > **(MCP)** Reference implementation: `get_section_template("bundle-products")`. Canonical PDP entry point: `get_function_doc("initBundleProducts")`. Settings shape: `get_type_definition("IkasBundleSettings")`.
@@ -505,6 +513,7 @@ When a product carries an option set (engraving text, uploaded artwork, date sel
 - **File options** upload through the storefront's upload function; constraint violations (extension, min/max file count) render merchant-editable error copy.
 - **Priced options** show their price on the label, and totals reflect them via storefront price helpers — no hand math (§11.1).
 - **After a successful ATC, option values reset** to their initial state.
+- **Lines show what was entered.** Cart lines and order views list the line's option values (name: value; file options by file name) — the shopper must be able to verify the engraving text before checkout.
 
 > **(MCP)** `get_framework_guide("product-options")`. Functions: `list_functions("Customization")`, `list_functions("ProductOption")`, `list_functions("ProductOptionSet")`. Reference: `get_section_child("product-detail-section", "ProductDetailOptionSet")`.
 
@@ -987,7 +996,8 @@ All inherit:
 
 #### Announcement Bar (sub of Header)
 
-- **Mandatory features:** 1–N rotating messages (TEXT[] or COMPONENT_LIST); auto-rotate interval (default 5s); manual prev/next on desktop; dismissible (sessionStorage).
+- **Mandatory features:** 1–N rotating messages (TEXT[] or COMPONENT_LIST); auto-rotate interval (default 5s); manual prev/next on desktop; dismissible (merchant BOOLEAN; the choice persists, and re-appears when the message content changes).
+- **A11y:** Any auto-moving variant (rotation, marquee) has a visible pause/play button reachable by keyboard and touch — hover/focus pause alone fails WCAG 2.2.2. `prefers-reduced-motion` stops the motion (and the pause button can go). Pause/play/close labels are TEXT props.
 - **MCP starter:** Implemented as a child of `header-section` or composed via `IkasThemeSlider` with autoplay.
 
 #### Not Found (404)
@@ -1015,7 +1025,7 @@ These are violations. Theme PRs that introduce them should be rejected.
 3. Blocking modals on page load.
 4. Auto-opening modals/drawers (Cart Drawer after ATC is the only allowed exception).
 5. Forced sign-up walls in front of browse / search / PDP.
-6. Carousels without keyboard navigation or pause-on-hover.
+6. Carousels / marquees without keyboard navigation or a visible pause control (hover-pause alone fails WCAG 2.2.2 for keyboard and touch users).
 7. Infinite scroll without a Load More fallback.
 8. Hidden cart count badge when count > 0.
 9. Layout-shifting images (no declared dimensions / aspect-ratio).
@@ -1034,6 +1044,10 @@ These are violations. Theme PRs that introduce them should be rejected.
 22. **Design-canonical:** Rewriting visual choices the design source made — replacing the palette, changing aspect ratios, swapping a designed layout for a "more standard" one — even when the change feels like a better default. The design source is canonical.
 23. **Design-canonical:** Inventing props from this doc instead of querying `get_section_template(...)`. The MCP template's prop list is the starting point; adapt it to the design, don't reconstruct it from prose.
 24. A dead out-of-stock button when the storefront has back-in-stock enabled — OOS must expose the §7.11 affordance (or route to the PDP, on cards).
+25. Swallowed failures: a `catch` that only logs (`console.*`) or a mutation result whose `success` is never read — the shopper sees nothing (§7.7, §7.8).
+26. A theme-side debounce around `searchProductList`, or an empty-results state shown before the current query's request finished (§7.5).
+27. ATC disabled because of unfilled product options — the gate blocks submission, the click reveals the errors (§7.1, §7.13).
+28. Dormant code paths without an entry point (e.g. a PDP edit-line mode no cart line links to) — untested branches that hide data-loss bugs (§7.1).
 
 ---
 

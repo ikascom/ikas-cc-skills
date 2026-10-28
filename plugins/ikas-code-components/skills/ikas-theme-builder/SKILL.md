@@ -92,5 +92,5 @@ Before reporting any task done:
 - **commerce.md §15 build checklist**, including a §14 scan. Read both from the file, not memory.
 - **Design-source fidelity:** no invented substitutions.
 - **Framework pitfalls:** `get_framework_guide("common-pitfalls")` when touching unfamiliar APIs.
-- **Lint:** `python3 <this skill's base directory>/scripts/lint.py <project-root>` exits 0. It mechanically checks the §14 items it can: root `observer`, `backgroundColor`, catch-less cart mutations, static text, reduced motion, DIY price formatting, multiple `<h1>`. Fix HATA findings. A deliberate exception goes into `--allow <file>` with a `//` justification.
+- **Lint:** `python3 <this skill's base directory>/scripts/lint.py <project-root>` exits 0. It mechanically checks the §14 items it can: root `observer`, `backgroundColor`, catch-less cart mutations, swallowed failures (console-only `catch`, unread mutation results), a theme-side debounce around `searchProductList`, static text, reduced motion, DIY price formatting, multiple `<h1>`, plus project-wide coverage (option sets never loaded, bundle sub-products / favorites never used, a dead edit-line mode). Fix HATA findings. A deliberate exception goes into `--allow <file>` with a `//` justification.
 - **Build:** `npx ikas-component check --json` and `npx ikas-component build` both pass clean.
